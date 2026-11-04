@@ -93,7 +93,7 @@ public class WorkflowExecutionController {
         String relativeFile = fullPath.substring(fullPath.indexOf(prefix) + prefix.length());
 
         if (relativeFile.isEmpty() || relativeFile.equals("/")) {
-            relativeFile = "karate-summary.html";
+            relativeFile = "workflow-report.html";
         }
 
         // Prevent path traversal
@@ -105,10 +105,13 @@ public class WorkflowExecutionController {
         Path targetFile = reportDir.resolve(relativeFile).normalize();
 
         if (!targetFile.startsWith(reportDir) || !Files.exists(targetFile)) {
-            // Check for fallback files (e.g. karate.generic-flow-executor.html if summary not yet written)
-            Path fallback = reportDir.resolve("karate.generic-flow-executor.html");
-            if (Files.exists(fallback)) {
-                targetFile = fallback;
+            // Check for fallback files (e.g. karate-summary.html or workflow-report.html)
+            Path fallbackSummary = reportDir.resolve("karate-summary.html");
+            Path fallbackWorkflow = reportDir.resolve("workflow-report.html");
+            if (Files.exists(fallbackWorkflow)) {
+                targetFile = fallbackWorkflow;
+            } else if (Files.exists(fallbackSummary)) {
+                targetFile = fallbackSummary;
             } else {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
             }

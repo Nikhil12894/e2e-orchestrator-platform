@@ -74,8 +74,18 @@ class DynamicKarateRunnerTest {
 
         // Verify HTML report was generated
         assertNotNull(finishedExecution.getReportPath());
+        assertTrue(finishedExecution.getReportPath().contains("workflow-report.html"));
         File reportDir = karateRunner.getReportDir(finishedExecution.getId()).toFile();
         assertTrue(reportDir.exists(), "Report directory should exist");
+
+        // Verify dedicated executive workflow profiling report was generated
+        File workflowReport = new File(reportDir, "workflow-report.html");
+        assertTrue(workflowReport.exists(), "workflow-report.html should be generated");
+        assertTrue(workflowReport.length() > 500, "workflow-report.html should contain content");
+
+        // Verify dynamic feature was generated with workflow name
+        File featureFile = new File(reportDir, "workflow-execution.feature");
+        assertTrue(featureFile.exists(), "workflow-execution.feature should be generated");
     }
 
     @Test

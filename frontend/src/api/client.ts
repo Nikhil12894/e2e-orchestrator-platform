@@ -39,6 +39,15 @@ export const catalogApi = {
   deleteEndpoint: async (id: string): Promise<void> => {
     await api.delete(`/catalog/endpoints/${id}`);
   },
+
+  deleteService: async (serviceName: string): Promise<{ message: string; count: number }> => {
+    const resp = await api.delete<{ message: string; count: number }>(`/catalog/services/${encodeURIComponent(serviceName)}`);
+    return resp.data;
+  },
+
+  clearCatalog: async (): Promise<void> => {
+    await api.delete('/catalog/endpoints');
+  },
 };
 
 export const workflowApi = {

@@ -171,4 +171,21 @@ paths:
         catalogService.deleteEndpoint(id);
         return ResponseEntity.noContent().build();
     }
+
+    @DeleteMapping("/services/{serviceName}")
+    @Operation(summary = "Delete Microservice", description = "Removes all endpoints associated with a microservice from catalog")
+    public ResponseEntity<Map<String, Object>> deleteService(@PathVariable("serviceName") String serviceName) {
+        int deleted = catalogService.deleteService(serviceName);
+        return ResponseEntity.ok(Map.of(
+                "message", "Successfully deleted microservice '" + serviceName + "' and " + deleted + " endpoints",
+                "count", deleted
+        ));
+    }
+
+    @DeleteMapping("/endpoints")
+    @Operation(summary = "Clear API Catalog", description = "Removes all endpoints from catalog")
+    public ResponseEntity<Map<String, Object>> clearCatalog() {
+        catalogService.clearCatalog();
+        return ResponseEntity.ok(Map.of("message", "API catalog successfully cleared"));
+    }
 }

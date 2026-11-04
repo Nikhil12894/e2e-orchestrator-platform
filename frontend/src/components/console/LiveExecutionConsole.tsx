@@ -114,10 +114,10 @@ export const LiveExecutionConsole: React.FC<LiveExecutionConsoleProps> = ({
           {execution?.reportPath && (
             <button
               onClick={() => onViewReport(execution.reportPath!)}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-medium transition-colors shadow"
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition-colors shadow"
             >
               <FileText className="w-3.5 h-3.5" />
-              View Karate HTML Report
+              View Execution & Profiling Report
             </button>
           )}
 

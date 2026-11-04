@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -35,15 +36,18 @@ public class DynamicKarateRunner {
     private final ExecutionLogBroadcaster logBroadcaster;
     private final ObjectMapper objectMapper;
     private final WorkflowContextEngine contextEngine;
+    private final WorkflowReportGenerator reportGenerator;
 
     public DynamicKarateRunner(WorkflowExecutionRepository executionRepository,
                                ExecutionLogBroadcaster logBroadcaster,
                                ObjectMapper objectMapper,
-                               WorkflowContextEngine contextEngine) {
+                               WorkflowContextEngine contextEngine,
+                               WorkflowReportGenerator reportGenerator) {
         this.executionRepository = executionRepository;
         this.logBroadcaster = logBroadcaster;
         this.objectMapper = objectMapper;
         this.contextEngine = contextEngine;
+        this.reportGenerator = reportGenerator;
     }
 
     public WorkflowExecutionEntity executeWorkflow(WorkflowExecutionEntity execution,
@@ -134,14 +138,24 @@ public class DynamicKarateRunner {
 
         SuiteResult karateResults = null;
         try {
-            // Execute Karate in-memory using generic master feature (Karate v2)
-            karateResults = Runner.path("classpath:karate/generic-flow-executor.feature")
+            // Dynamically generate feature attributed to this specific workflow in a dedicated staging directory
+            Path featuresDir = reportDir.resolveSibling("karate-features").resolve(executionId.toString());
+            Files.createDirectories(featuresDir);
+            Path featureFile = featuresDir.resolve("workflow-execution.feature");
+            String featureContent = buildDynamicFeatureContent(workflow, environment);
+            Files.writeString(featureFile, featureContent, StandardCharsets.UTF_8);
+
+            // Execute Karate with workflow-attributed feature file (Karate v2)
+            karateResults = Runner.path(featureFile.toAbsolutePath().toString())
                     .configDir("classpath:karate")
                     .systemProperty("karate.executionId", executionId.toString())
                     .karateEnv(environment != null ? environment : "default")
                     .outputHtmlReport(true)
                     .outputDir(reportDir.toString())
                     .parallel(1);
+
+            // Copy feature file into reportDir for self-contained archiving
+            Files.copy(featureFile, reportDir.resolve("workflow-execution.feature"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
         } catch (Exception e) {
             log.error("Exception during Karate execution run: {}", e.getMessage(), e);
@@ -174,19 +188,12 @@ public class DynamicKarateRunner {
         finalExecution.setContextSnapshot(finalContext);
         finalExecution.setStepResults(stepResults);
 
-        // Locate generated report file
-        String relativeReportPath = "/api/v1/executions/" + executionId + "/report/karate-summary.html";
-        File summaryHtml = new File(reportDir.toFile(), "karate-summary.html");
-        if (summaryHtml.exists()) {
-            finalExecution.setReportPath(relativeReportPath);
+        // Generate Executive Workflow Profiling & Performance Report
+        File profilingReport = reportGenerator.generateReport(finalExecution, workflow, reportDir);
+        if (profilingReport != null && profilingReport.exists()) {
+            finalExecution.setReportPath("/api/v1/executions/" + executionId + "/report/workflow-report.html");
         } else {
-            // Check for generic-flow-executor.html
-            File featureHtml = new File(reportDir.toFile(), "karate.generic-flow-executor.html");
-            if (featureHtml.exists()) {
-                finalExecution.setReportPath("/api/v1/executions/" + executionId + "/report/karate.generic-flow-executor.html");
-            } else {
-                finalExecution.setReportPath(relativeReportPath);
-            }
+            finalExecution.setReportPath("/api/v1/executions/" + executionId + "/report/karate-summary.html");
         }
 
         if (karateResults != null && karateResults.getErrors() != null && !karateResults.getErrors().isEmpty()) {
@@ -215,5 +222,55 @@ public class DynamicKarateRunner {
 
     public Path getReportDir(UUID executionId) {
         return Paths.get(reportsBasePath, executionId.toString()).toAbsolutePath().normalize();
+    }
+
+    private String buildDynamicFeatureContent(TestWorkflowEntity workflow, String environment) {
+        String cleanName = workflow.getName() != null ? workflow.getName().replace("\n", " ").trim() : "Workflow";
+        int version = workflow.getVersion();
+        String envStr = environment != null ? environment : "default";
+
+        return """
+@lock=workflow-execution
+Feature: Workflow: %s (v%d) [Env: %s]
+
+  Background:
+    * def Bridge = Java.type('com.orchestrator.platform.service.execution.DynamicKarateBridge')
+    * def executionId = karate.properties['karate.executionId'] || java.lang.System.getProperty('karate.executionId')
+    * def payload = Bridge.getActiveWorkflowPayload(executionId)
+    * def workflowId = payload.workflowId
+    * def flowHeaders = payload.flowHeaders || {}
+    * def steps = payload.steps || []
+    * def globalContext = payload.initialVariables || {}
+
+  Scenario: Execute Steps For Workflow: %s
+    * def stepCount = karate.sizeOf(steps)
+    * eval Bridge.onWorkflowStart(executionId, workflowId, stepCount)
+    * def executeStepFeature = 'classpath:karate/execute-step.feature'
+    * def runStep =
+      \"\"\"
+      function(stepItem, idx) {
+        if (!stepItem.enabled && stepItem.enabled !== undefined) {
+          karate.log('Skipping disabled step:', stepItem.id);
+          return { skipped: true };
+        }
+        var callArgs = {
+          step: stepItem,
+          executionId: executionId,
+          stepIndex: idx,
+          flowHeaders: flowHeaders,
+          globalContext: globalContext
+        };
+        var stepResult = karate.call(executeStepFeature, callArgs);
+        if (stepResult && stepResult.extractedVars) {
+          for (var key in stepResult.extractedVars) {
+            globalContext[key] = stepResult.extractedVars[key];
+          }
+        }
+        return stepResult;
+      }
+      \"\"\"
+    * def results = karate.forEach(steps, runStep)
+    * eval Bridge.onWorkflowComplete(executionId, globalContext)
+""".formatted(cleanName, version, envStr, cleanName);
     }
 }

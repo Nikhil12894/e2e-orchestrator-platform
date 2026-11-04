@@ -271,4 +271,16 @@ public class OpenApiCatalogService {
     public void deleteEndpoint(UUID id) {
         endpointRepository.deleteById(id);
     }
+
+    @Transactional
+    public int deleteService(String serviceName) {
+        log.info("Deleting all endpoints for microservice: {}", serviceName);
+        return endpointRepository.deleteByServiceName(serviceName);
+    }
+
+    @Transactional
+    public void clearCatalog() {
+        log.info("Clearing all endpoints from API catalog");
+        endpointRepository.deleteAllEndpoints();
+    }
 }

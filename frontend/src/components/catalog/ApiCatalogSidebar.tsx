@@ -12,7 +12,10 @@ import {
   Timer,
   GripVertical,
   RefreshCw,
-  FolderOpen
+  FolderOpen,
+  Trash2,
+  AlertTriangle,
+  X
 } from 'lucide-react';
 import { ApiEndpoint, HttpMethod } from '../../types/workflow';
 import { catalogApi } from '../../api/client';
@@ -43,6 +46,10 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
   const [collapsedServices, setCollapsedServices] = useState<Record<string, boolean>>({});
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
+  // Deletion confirmation states
+  const [serviceToDelete, setServiceToDelete] = useState<{ name: string; count: number } | null>(null);
+  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
+
   const fetchEndpoints = async () => {
     setLoading(true);
     try {
@@ -70,6 +77,43 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
       await fetchEndpoints();
     } catch (err) {
       console.error('Failed to seed samples', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteService = async () => {
+    if (!serviceToDelete) return;
+    setLoading(true);
+    try {
+      await catalogApi.deleteService(serviceToDelete.name);
+      setServiceToDelete(null);
+      await fetchEndpoints();
+    } catch (err) {
+      console.error('Failed to delete service', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteEndpoint = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    try {
+      await catalogApi.deleteEndpoint(id);
+      await fetchEndpoints();
+    } catch (err) {
+      console.error('Failed to delete endpoint', err);
+    }
+  };
+
+  const handleClearCatalog = async () => {
+    setLoading(true);
+    try {
+      await catalogApi.clearCatalog();
+      setIsClearConfirmOpen(false);
+      await fetchEndpoints();
+    } catch (err) {
+      console.error('Failed to clear catalog', err);
     } finally {
       setLoading(false);
     }
@@ -147,20 +191,28 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
           </div>
 
           {/* Action buttons */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-1.5">
             <button
               onClick={() => setIsImportModalOpen(true)}
-              className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded-lg text-[11px] font-medium transition-colors"
+              className="flex items-center justify-center gap-1 py-1.5 px-2 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded-lg text-[10px] font-medium transition-colors"
             >
               <Plus className="w-3 h-3" />
-              Import Spec
+              Import
             </button>
             <button
               onClick={handleSeedSamples}
-              className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 rounded-lg text-[11px] font-medium transition-colors"
+              className="flex items-center justify-center gap-1 py-1.5 px-2 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 rounded-lg text-[10px] font-medium transition-colors"
             >
               <Sparkles className="w-3 h-3" />
-              Seed APIs
+              Seed
+            </button>
+            <button
+              onClick={() => setIsClearConfirmOpen(true)}
+              disabled={endpoints.length === 0}
+              className="flex items-center justify-center gap-1 py-1.5 px-2 bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 border border-rose-500/20 rounded-lg text-[10px] font-medium transition-colors disabled:opacity-40"
+            >
+              <Trash2 className="w-3 h-3" />
+              Clear
             </button>
           </div>
         </div>
@@ -235,9 +287,9 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
               return (
                 <div key={service} className="rounded-lg border border-slate-800/80 bg-slate-950/40 overflow-hidden">
                   {/* Service Header */}
-                  <button
+                  <div
                     onClick={() => toggleService(service)}
-                    className="w-full flex items-center justify-between px-3 py-2 bg-slate-900/60 hover:bg-slate-900 text-left transition-colors"
+                    className="w-full flex items-center justify-between px-3 py-2 bg-slate-900/60 hover:bg-slate-900 text-left transition-colors cursor-pointer select-none"
                   >
                     <div className="flex items-center gap-2">
                       {isCollapsed ? (
@@ -248,10 +300,22 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
                       <Server className="w-3.5 h-3.5 text-blue-400" />
                       <span className="font-semibold text-xs text-slate-200">{service}</span>
                     </div>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400">
-                      {eps.length}
-                    </span>
-                  </button>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400">
+                        {eps.length}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setServiceToDelete({ name: service, count: eps.length });
+                        }}
+                        title={`Delete ${service} spec & endpoints`}
+                        className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
 
                   {/* Endpoints List */}
                   {!isCollapsed && (
@@ -279,6 +343,13 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
                                 <p className="text-[10px] font-mono text-slate-500 truncate">{ep.endpointPath}</p>
                               </div>
                             </div>
+                            <button
+                              onClick={(e) => handleDeleteEndpoint(e, ep.id)}
+                              title="Delete endpoint from catalog"
+                              className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-rose-400 transition-opacity"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
                           </div>
                         );
                       })}
@@ -290,6 +361,73 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
           )}
         </div>
       </aside>
+
+      {/* Delete Microservice Confirmation Modal */}
+      {serviceToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 select-none">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-5 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-100">Remove Microservice?</h3>
+                <p className="text-xs text-slate-400">
+                  Delete <span className="text-rose-300 font-semibold">{serviceToDelete.name}</span> and all{' '}
+                  <span className="font-mono text-slate-200">{serviceToDelete.count}</span> endpoints from the catalog.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setServiceToDelete(null)}
+                className="px-3 py-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-300 text-xs font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteService}
+                className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-lg shadow-rose-600/20 transition-all"
+              >
+                Delete Service
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear Entire Catalog Confirmation Modal */}
+      {isClearConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 select-none">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-5 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-100">Clear Entire Catalog?</h3>
+                <p className="text-xs text-slate-400">
+                  This will remove all <span className="font-semibold text-rose-300">{endpoints.length}</span> endpoints across all services from the catalog.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setIsClearConfirmOpen(false)}
+                className="px-3 py-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-300 text-xs font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClearCatalog}
+                className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-lg shadow-rose-600/20 transition-all"
+              >
+                Clear All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Import Modal */}
       <ImportSpecModal
