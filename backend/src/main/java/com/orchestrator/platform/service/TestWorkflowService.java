@@ -1,22 +1,37 @@
 package com.orchestrator.platform.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Queue;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.orchestrator.platform.domain.entity.TestWorkflowEntity;
 import com.orchestrator.platform.domain.enums.StepType;
-import com.orchestrator.platform.domain.model.ast.*;
+import com.orchestrator.platform.domain.model.ast.DbPollStepConfig;
+import com.orchestrator.platform.domain.model.ast.HttpRequestStepConfig;
+import com.orchestrator.platform.domain.model.ast.KafkaAssertStepConfig;
+import com.orchestrator.platform.domain.model.ast.StepAssertion;
+import com.orchestrator.platform.domain.model.ast.VariableExtraction;
+import com.orchestrator.platform.domain.model.ast.WorkflowAst;
+import com.orchestrator.platform.domain.model.ast.WorkflowStep;
 import com.orchestrator.platform.domain.model.canvas.CanvasEdge;
 import com.orchestrator.platform.domain.model.canvas.CanvasNode;
 import com.orchestrator.platform.domain.model.canvas.CanvasPosition;
 import com.orchestrator.platform.domain.model.canvas.CanvasState;
 import com.orchestrator.platform.domain.model.dto.WorkflowCreateRequest;
 import com.orchestrator.platform.repository.TestWorkflowRepository;
-import jakarta.annotation.PostConstruct;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import jakarta.annotation.PostConstruct;
 
 @Service
 public class TestWorkflowService {
@@ -24,11 +39,9 @@ public class TestWorkflowService {
     private static final Logger log = LoggerFactory.getLogger(TestWorkflowService.class);
 
     private final TestWorkflowRepository workflowRepository;
-    private final ObjectMapper objectMapper;
 
-    public TestWorkflowService(TestWorkflowRepository workflowRepository, ObjectMapper objectMapper) {
+    public TestWorkflowService(TestWorkflowRepository workflowRepository) {
         this.workflowRepository = workflowRepository;
-        this.objectMapper = objectMapper;
     }
 
     @Transactional(readOnly = true)

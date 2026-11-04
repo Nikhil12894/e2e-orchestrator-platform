@@ -36,7 +36,6 @@ public class TestWorkflowExecutionService {
         this.virtualThreadExecutor = virtualThreadExecutor;
     }
 
-    @Transactional
     public WorkflowExecutionEntity triggerExecution(UUID workflowId, WorkflowExecutionRequest request) {
         TestWorkflowEntity workflow = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new IllegalArgumentException("Workflow not found with ID: " + workflowId));
@@ -47,7 +46,8 @@ public class TestWorkflowExecutionService {
         execution.setStatus(ExecutionStatus.PENDING);
         execution.setTriggerType(request.getTriggerType());
 
-        WorkflowExecutionEntity savedExecution = executionRepository.save(execution);
+        WorkflowExecutionEntity savedExecution = executionRepository.saveAndFlush(execution);
+        UUID executionId = savedExecution.getId();
 
         // Offload execution to Java 21 Virtual Threads
         virtualThreadExecutor.submit(() -> {
@@ -60,9 +60,11 @@ public class TestWorkflowExecutionService {
                 );
             } catch (Exception e) {
                 log.error("Unhandled error during async virtual thread workflow execution: {}", e.getMessage(), e);
-                savedExecution.setStatus(ExecutionStatus.FAILED);
-                savedExecution.setErrorMessage(e.getMessage());
-                executionRepository.save(savedExecution);
+                executionRepository.findById(executionId).ifPresent(ex -> {
+                    ex.setStatus(ExecutionStatus.FAILED);
+                    ex.setErrorMessage(e.getMessage());
+                    executionRepository.saveAndFlush(ex);
+                });
             }
         });
 

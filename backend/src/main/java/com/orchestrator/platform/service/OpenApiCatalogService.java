@@ -13,8 +13,10 @@ import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.parameters.RequestBody;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.parser.core.models.SwaggerParseResult;
+import jakarta.persistence.criteria.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -244,7 +246,22 @@ public class OpenApiCatalogService {
     }
 
     public List<ApiEndpointEntity> getEndpoints(String serviceName, String search) {
-        return endpointRepository.searchEndpoints(serviceName, search);
+        Specification<ApiEndpointEntity> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (serviceName != null && !serviceName.trim().isEmpty()) {
+                predicates.add(cb.equal(root.get("serviceName"), serviceName.trim()));
+            }
+            if (search != null && !search.trim().isEmpty()) {
+                String pattern = "%" + search.toLowerCase().trim() + "%";
+                Predicate pathMatch = cb.like(cb.lower(root.get("endpointPath")), pattern);
+                Predicate summaryMatch = cb.like(cb.lower(root.get("summary")), pattern);
+                Predicate opMatch = cb.like(cb.lower(root.get("operationId")), pattern);
+                predicates.add(cb.or(pathMatch, summaryMatch, opMatch));
+            }
+            query.orderBy(cb.asc(root.get("serviceName")), cb.asc(root.get("endpointPath")), cb.asc(root.get("httpMethod")));
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+        return endpointRepository.findAll(spec);
     }
 
     public List<String> getServices() {

@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for Spring Boot 4 + Java 25 Backend
-FROM maven:3.9.9-eclipse-temurin-25-alpine AS builder
+FROM maven:3.9.11-eclipse-temurin-25-alpine AS builder
 
 WORKDIR /build
 
@@ -27,7 +27,7 @@ USER appuser
 
 EXPOSE 8080
 
-ENV JAVA_OPTS="-XX:+UseZGC -XX:+ZGenerational -XX:MaxRAMPercentage=75.0"
+ENV JAVA_OPTS="-XX:+UseZGC -XX:MaxRAMPercentage=75.0 --enable-native-access=ALL-UNNAMED"
 ENV ORCHESTRATOR_REPORTS_PATH="/app/reports"
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

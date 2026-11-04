@@ -50,9 +50,10 @@ public class DynamicKarateRunner {
         log.info("Starting Dynamic Karate Execution [id={}, workflow={}]", executionId, workflow.getName());
 
         long startTime = System.currentTimeMillis();
-        execution.setStatus(ExecutionStatus.RUNNING);
-        execution.setStartTime(Instant.ofEpochMilli(startTime));
-        executionRepository.save(execution);
+        WorkflowExecutionEntity currentExecution = executionRepository.findById(executionId).orElse(execution);
+        currentExecution.setStatus(ExecutionStatus.RUNNING);
+        currentExecution.setStartTime(Instant.ofEpochMilli(startTime));
+        currentExecution = executionRepository.saveAndFlush(currentExecution);
 
         // Prepare execution report directory
         Path reportDir = Paths.get(reportsBasePath, executionId.toString()).toAbsolutePath().normalize();
@@ -92,10 +93,11 @@ public class DynamicKarateRunner {
         try {
             // Execute Karate in-memory using generic master feature (Karate v2)
             karateResults = Runner.path("classpath:karate/generic-flow-executor.feature")
+                    .configDir("classpath:karate")
                     .systemProperty("karate.executionId", executionId.toString())
                     .karateEnv(environment != null ? environment : "default")
                     .outputHtmlReport(true)
-                    .reportDir(reportDir.toString())
+                    .outputDir(reportDir.toString())
                     .parallel(1);
 
         } catch (Exception e) {
@@ -117,33 +119,38 @@ public class DynamicKarateRunner {
         execution.setStepResults(stepResults);
 
         // Determine final execution status
-        boolean failed = (karateResults != null && karateResults.getFailCount() > 0) || execution.getErrorMessage() != null;
+        boolean failed = (karateResults != null && karateResults.isFailed()) || execution.getErrorMessage() != null;
         if (!failed && stepResults.stream().anyMatch(s -> s.getStatus() == ExecutionStatus.FAILED)) {
             failed = true;
         }
 
-        execution.setStatus(failed ? ExecutionStatus.FAILED : ExecutionStatus.COMPLETED);
+        WorkflowExecutionEntity finalExecution = executionRepository.findById(executionId).orElse(currentExecution);
+        finalExecution.setStatus(failed ? ExecutionStatus.FAILED : ExecutionStatus.COMPLETED);
+        finalExecution.setDurationMs(durationMs);
+        finalExecution.setEndTime(Instant.ofEpochMilli(endTime));
+        finalExecution.setContextSnapshot(finalContext);
+        finalExecution.setStepResults(stepResults);
 
         // Locate generated report file
         String relativeReportPath = "/api/v1/executions/" + executionId + "/report/karate-summary.html";
         File summaryHtml = new File(reportDir.toFile(), "karate-summary.html");
         if (summaryHtml.exists()) {
-            execution.setReportPath(relativeReportPath);
+            finalExecution.setReportPath(relativeReportPath);
         } else {
             // Check for generic-flow-executor.html
             File featureHtml = new File(reportDir.toFile(), "karate.generic-flow-executor.html");
             if (featureHtml.exists()) {
-                execution.setReportPath("/api/v1/executions/" + executionId + "/report/karate.generic-flow-executor.html");
+                finalExecution.setReportPath("/api/v1/executions/" + executionId + "/report/karate.generic-flow-executor.html");
             } else {
-                execution.setReportPath(relativeReportPath);
+                finalExecution.setReportPath(relativeReportPath);
             }
         }
 
-        if (karateResults != null && karateResults.getErrorMessages() != null && !karateResults.getErrorMessages().isEmpty()) {
-            execution.setErrorMessage(karateResults.getErrorMessages());
+        if (karateResults != null && karateResults.getErrors() != null && !karateResults.getErrors().isEmpty()) {
+            finalExecution.setErrorMessage(String.join("\n", karateResults.getErrors()));
         }
 
-        WorkflowExecutionEntity saved = executionRepository.save(execution);
+        WorkflowExecutionEntity saved = executionRepository.saveAndFlush(finalExecution);
         DynamicKarateBridge.cleanupExecution(executionId.toString());
 
         // Broadcast final execution finished event

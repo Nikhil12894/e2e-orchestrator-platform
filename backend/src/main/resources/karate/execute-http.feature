@@ -16,9 +16,11 @@ Feature: Execute HTTP Request Step
     * def reqBody = (httpMethod == 'get' || httpMethod == 'delete') ? null : httpCfg.body
     * request reqBody
 
-    # Configure Karate v2 Polling & Retry if specified
-    * if (httpCfg.retryCount) karate.configure('retry', { count: httpCfg.retryCount, interval: httpCfg.retryIntervalMs || 1000 })
-    * if (httpCfg.retryUntil) retry until eval(httpCfg.retryUntil)
+    # Configure Karate v2 Polling & Retry
+    * def retryAttempts = httpCfg.retryCount || 1
+    * def retryInterval = httpCfg.retryIntervalMs || 500
+    * eval karate.configure('retry', { count: retryAttempts, interval: retryInterval })
+    * retry until responseStatus == expectedStatus
 
     # Perform Native HTTP Call
     * method httpMethod
