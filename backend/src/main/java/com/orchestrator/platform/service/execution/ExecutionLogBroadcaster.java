@@ -78,16 +78,24 @@ public class ExecutionLogBroadcaster {
         if (executionId != null && sseEmitters.containsKey(executionId)) {
             List<SseEmitter> emitters = sseEmitters.get(executionId);
             List<SseEmitter> deadEmitters = new ArrayList<>();
+            boolean isFinished = "WORKFLOW_FINISHED".equals(event.getEventType());
             for (SseEmitter emitter : emitters) {
                 try {
                     emitter.send(SseEmitter.event()
                             .name("execution-event")
                             .data(event));
+                    if (isFinished) {
+                        emitter.complete();
+                    }
                 } catch (IOException e) {
                     deadEmitters.add(emitter);
                 }
             }
-            emitters.removeAll(deadEmitters);
+            if (isFinished) {
+                sseEmitters.remove(executionId);
+            } else {
+                emitters.removeAll(deadEmitters);
+            }
         }
     }
 

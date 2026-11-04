@@ -22,6 +22,8 @@ interface NodeConfigDrawerProps {
   selectedNode: CanvasNode | null;
   onUpdateNodeData: (nodeId: string, newData: Partial<CanvasNodeData>) => void;
   allNodes: CanvasNode[];
+  edges?: Array<{ id: string; source: string; target: string }>;
+  onDeleteEdge?: (edgeId: string) => void;
 }
 
 export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
@@ -30,6 +32,8 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
   selectedNode,
   onUpdateNodeData,
   allNodes,
+  edges = [],
+  onDeleteEdge,
 }) => {
   const [activeTab, setActiveTab] = useState<'config' | 'extractions' | 'assertions'>('config');
   const [isVarModalOpen, setIsVarModalOpen] = useState(false);
@@ -484,6 +488,80 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                   />
                 </div>
               )}
+
+              {/* Step Links & Connections */}
+              <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-300">Connections & Links</span>
+                  <span className="text-[10px] text-slate-500 font-mono">Modifiable</span>
+                </div>
+
+                {/* Predecessors */}
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase font-semibold block mb-1">Incoming Links (From)</span>
+                  {edges.filter((e) => e.target === selectedNode.id).length === 0 ? (
+                    <p className="text-[10px] text-slate-600 italic">No incoming links (entry step)</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {edges
+                        .filter((e) => e.target === selectedNode.id)
+                        .map((edge) => {
+                          const srcNode = allNodes.find((n) => n.id === edge.source);
+                          return (
+                            <div
+                              key={edge.id}
+                              className="flex items-center justify-between p-1.5 rounded bg-slate-900 border border-slate-800 text-[11px]"
+                            >
+                              <span className="truncate text-slate-300">{srcNode?.data?.name || edge.source}</span>
+                              {onDeleteEdge && (
+                                <button
+                                  type="button"
+                                  onClick={() => onDeleteEdge(edge.id)}
+                                  className="text-[10px] text-rose-400 hover:text-rose-300 hover:underline px-1"
+                                >
+                                  Disconnect
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Successors */}
+                <div>
+                  <span className="text-[10px] text-slate-500 uppercase font-semibold block mb-1">Outgoing Links (To)</span>
+                  {edges.filter((e) => e.source === selectedNode.id).length === 0 ? (
+                    <p className="text-[10px] text-slate-600 italic">No outgoing links (terminal step)</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {edges
+                        .filter((e) => e.source === selectedNode.id)
+                        .map((edge) => {
+                          const targetNode = allNodes.find((n) => n.id === edge.target);
+                          return (
+                            <div
+                              key={edge.id}
+                              className="flex items-center justify-between p-1.5 rounded bg-slate-900 border border-slate-800 text-[11px]"
+                            >
+                              <span className="truncate text-slate-300">{targetNode?.data?.name || edge.target}</span>
+                              {onDeleteEdge && (
+                                <button
+                                  type="button"
+                                  onClick={() => onDeleteEdge(edge.id)}
+                                  className="text-[10px] text-rose-400 hover:text-rose-300 hover:underline px-1"
+                                >
+                                  Disconnect
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              </div>
             </>
           )}
 

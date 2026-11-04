@@ -20,6 +20,7 @@ import { HttpRequestNode } from './nodes/HttpRequestNode';
 import { DbPollNode } from './nodes/DbPollNode';
 import { KafkaAssertNode } from './nodes/KafkaAssertNode';
 import { DelayNode } from './nodes/DelayNode';
+import { RemovableEdge } from './edges/RemovableEdge';
 import { CanvasNode, CanvasEdge } from '../../types/workflow';
 
 const nodeTypes: any = {
@@ -29,12 +30,18 @@ const nodeTypes: any = {
   delay: DelayNode,
 };
 
+const edgeTypes: any = {
+  default: RemovableEdge,
+  removable: RemovableEdge,
+};
+
 interface FlowCanvasInnerProps {
   nodes: Node[];
   edges: Edge[];
   onNodesChange: OnNodesChange<Node>;
   onEdgesChange: OnEdgesChange<Edge>;
   onConnect: (connection: Connection) => void;
+  onReconnect?: (oldEdge: Edge, newConnection: Connection) => void;
   onNodeClick: (event: React.MouseEvent, node: Node) => void;
   onDropNewNode: (type: string, position: { x: number; y: number }, initialData: Record<string, any>) => void;
 }
@@ -45,6 +52,7 @@ const FlowCanvasInner: React.FC<FlowCanvasInnerProps> = ({
   onNodesChange,
   onEdgesChange,
   onConnect,
+  onReconnect,
   onNodeClick,
   onDropNewNode,
 }) => {
@@ -86,8 +94,15 @@ const FlowCanvasInner: React.FC<FlowCanvasInnerProps> = ({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onReconnect={onReconnect}
+        edgesReconnectable={true}
         onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={{
+          type: 'removable',
+          animated: true,
+        }}
         fitView
         deleteKeyCode={['Backspace', 'Delete']}
         className="bg-slate-950"
@@ -116,6 +131,7 @@ interface FlowCanvasProps {
   onNodesChange: OnNodesChange<Node>;
   onEdgesChange: OnEdgesChange<Edge>;
   onConnect: (connection: Connection) => void;
+  onReconnect?: (oldEdge: Edge, newConnection: Connection) => void;
   onNodeClick: (event: React.MouseEvent, node: Node) => void;
   onDropNewNode: (type: string, position: { x: number; y: number }, initialData: Record<string, any>) => void;
 }

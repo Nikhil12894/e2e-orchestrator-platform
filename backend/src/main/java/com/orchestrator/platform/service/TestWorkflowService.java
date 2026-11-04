@@ -31,6 +31,7 @@ import com.orchestrator.platform.domain.model.canvas.CanvasPosition;
 import com.orchestrator.platform.domain.model.canvas.CanvasState;
 import com.orchestrator.platform.domain.model.dto.WorkflowCreateRequest;
 import com.orchestrator.platform.repository.TestWorkflowRepository;
+import com.orchestrator.platform.repository.WorkflowExecutionRepository;
 
 import jakarta.annotation.PostConstruct;
 
@@ -40,9 +41,12 @@ public class TestWorkflowService {
     private static final Logger log = LoggerFactory.getLogger(TestWorkflowService.class);
 
     private final TestWorkflowRepository workflowRepository;
+    private final WorkflowExecutionRepository executionRepository;
 
-    public TestWorkflowService(TestWorkflowRepository workflowRepository) {
+    public TestWorkflowService(TestWorkflowRepository workflowRepository,
+                               WorkflowExecutionRepository executionRepository) {
         this.workflowRepository = workflowRepository;
+        this.executionRepository = executionRepository;
     }
 
     @Transactional(readOnly = true)
@@ -126,7 +130,9 @@ public class TestWorkflowService {
 
     @Transactional
     public void deleteWorkflow(UUID id) {
+        executionRepository.deleteByWorkflowId(id);
         workflowRepository.deleteById(id);
+        log.info("Deleted workflow {} and its associated executions", id);
     }
 
     /**

@@ -28,6 +28,7 @@ interface WorkflowSettingsModalProps {
     envProperties: Record<string, Record<string, any>>;
     secrets: Record<string, string>;
   }) => void;
+  onDeleteWorkflow?: (workflowId: string) => void;
 }
 
 export const WorkflowSettingsModal: React.FC<WorkflowSettingsModalProps> = ({
@@ -35,6 +36,7 @@ export const WorkflowSettingsModal: React.FC<WorkflowSettingsModalProps> = ({
   onClose,
   workflow,
   onSaveSettings,
+  onDeleteWorkflow,
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'defaultHeaders' | 'dynamicHeaders' | 'envProperties' | 'secrets'>('general');
 
@@ -283,6 +285,33 @@ export const WorkflowSettingsModal: React.FC<WorkflowSettingsModalProps> = ({
                   <span className="font-mono text-slate-300">{new Date(workflow.createdAt).toLocaleString()}</span>
                 </div>
               </div>
+
+              {/* Danger Zone: Delete Workflow */}
+              {onDeleteWorkflow && (
+                <div className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-semibold text-rose-300">Danger Zone</h4>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Permanently delete this workflow and all associated execution reports.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm(`Are you sure you want to permanently delete workflow "${workflow.name}"?`)) {
+                          onDeleteWorkflow(workflow.id);
+                          onClose();
+                        }
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs font-semibold transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Workflow</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

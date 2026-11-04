@@ -8,6 +8,7 @@ import {
   OnEdgesChange,
   Connection,
   addEdge,
+  reconnectEdge,
 } from '@xyflow/react';
 
 import { Navbar } from './components/navbar/Navbar';
@@ -45,10 +46,16 @@ export function App() {
   const [environment, setEnvironment] = useState('default');
   const [isRunning, setIsRunning] = useState(false);
   const [activeExecution, setActiveExecution] = useState<WorkflowExecution | null>(null);
+  const [workflowExecutions, setWorkflowExecutions] = useState<WorkflowExecution[]>([]);
   const [executionEvents, setExecutionEvents] = useState<ExecutionEventDto[]>([]);
 
   // Report Modal state
   const [reportModalUrl, setReportModalUrl] = useState<string | null>(null);
+
+  // Delete edge handler (used by RemovableEdge midpoint button & NodeConfigDrawer)
+  const handleDeleteEdge = useCallback((edgeId: string) => {
+    setEdges((eds) => eds.filter((e) => e.id !== edgeId));
+  }, []);
 
   // 1. Load workflows on mount
   const loadWorkflows = async () => {
@@ -79,19 +86,36 @@ export function App() {
       data: n.data || {},
     }));
 
-    // Format edges for React Flow
+    // Format edges for React Flow with custom removable edge type and delete callback
     const flowEdges: Edge[] = (canvas.edges || []).map((e) => ({
       id: e.id,
       source: e.source,
       target: e.target,
+      type: 'removable',
       animated: e.animated ?? true,
       style: { stroke: '#475569', strokeWidth: 2 },
+      data: { onDelete: handleDeleteEdge },
     }));
 
     setNodes(flowNodes);
     setEdges(flowEdges);
     setSelectedNode(null);
     setIsDrawerOpen(false);
+
+    // Fetch executions history for this workflow
+    executionApi
+      .getExecutions(wf.id)
+      .then((runs) => {
+        setWorkflowExecutions(runs);
+        if (runs.length > 0) {
+          setActiveExecution(runs[0]);
+        } else {
+          setActiveExecution(null);
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to load workflow execution history', err);
+      });
   };
 
   // Node & Edge change handlers
@@ -105,19 +129,28 @@ export function App() {
     []
   );
 
+  // Reconnect edge when user drags edge endpoint
+  const onReconnect = useCallback(
+    (oldEdge: Edge, newConnection: Connection) =>
+      setEdges((eds) => reconnectEdge(oldEdge, newConnection, eds)),
+    []
+  );
+
   const onConnect = useCallback(
     (connection: Connection) =>
       setEdges((eds) =>
         addEdge(
           {
             ...connection,
+            type: 'removable',
             animated: true,
             style: { stroke: '#475569', strokeWidth: 2 },
+            data: { onDelete: handleDeleteEdge },
           },
           eds
         )
       ),
-    []
+    [handleDeleteEdge]
   );
 
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
@@ -167,8 +200,10 @@ export function App() {
         id: `e_${lastNode.id}_${newNodeId}`,
         source: lastNode.id,
         target: newNodeId,
+        type: 'removable',
         animated: true,
         style: { stroke: '#475569', strokeWidth: 2 },
+        data: { onDelete: handleDeleteEdge },
       };
       setEdges((prev) => [...prev, newEdge]);
     }
@@ -219,6 +254,30 @@ export function App() {
       return updated;
     } catch (err) {
       console.error('Failed to save workflow', err);
+    }
+  };
+
+  // Delete workflow
+  const handleDeleteWorkflow = async (workflowId: string) => {
+    try {
+      await workflowApi.deleteWorkflow(workflowId);
+      const remaining = workflows.filter((w) => w.id !== workflowId);
+      setWorkflows(remaining);
+      if (selectedWorkflow?.id === workflowId) {
+        if (remaining.length > 0) {
+          selectWorkflow(remaining[0]);
+        } else {
+          setSelectedWorkflow(null);
+          setNodes([]);
+          setEdges([]);
+        }
+      }
+      setActiveExecution(null);
+      setExecutionEvents([]);
+      setWorkflowExecutions([]);
+    } catch (err) {
+      console.error('Failed to delete workflow', err);
+      alert('Failed to delete workflow. Please check server logs.');
     }
   };
 
@@ -347,13 +406,57 @@ export function App() {
       const execution = await executionApi.triggerExecution(selectedWorkflow.id, {}, environment);
       setActiveExecution(execution);
 
+      // Resilient Polling Fallback (1-second interval):
+      // Guarantees UI completion even if SSE drops, lags, or buffers
+      let isDone = false;
+      const pollInterval = setInterval(async () => {
+        if (isDone) return;
+        try {
+          const fresh = await executionApi.getExecutionById(execution.id);
+          if (fresh.status === 'COMPLETED' || fresh.status === 'FAILED') {
+            isDone = true;
+            clearInterval(pollInterval);
+            setIsRunning(false);
+            setActiveExecution(fresh);
+            setWorkflowExecutions((prev) => [fresh, ...prev.filter((e) => e.id !== fresh.id)]);
+
+            // Sync canvas node statuses
+            if (fresh.stepResults) {
+              setNodes((nds) =>
+                nds.map((n) => {
+                  const stepRes = fresh.stepResults?.find((s) => s.stepId === n.id);
+                  if (stepRes) {
+                    return {
+                      ...n,
+                      data: {
+                        ...n.data,
+                        status: stepRes.status,
+                        durationMs: stepRes.durationMs,
+                      },
+                    };
+                  }
+                  return n;
+                })
+              );
+            }
+          }
+        } catch (e) {
+          console.warn('Execution status poll check error', e);
+        }
+      }, 1000);
+
       // Subscribe to real-time SSE event stream
       const unsubscribe = executionApi.subscribeToExecutionEvents(
         execution.id,
         (event) => {
           setExecutionEvents((prev) => [...prev, event]);
 
-          // Update node status on canvas in real time!
+          // Transition status to RUNNING as soon as execution starts
+          if (event.eventType === 'WORKFLOW_STARTED') {
+            setActiveExecution((prev) => (prev ? { ...prev, status: 'RUNNING' } : prev));
+          }
+
+          // Update node status on canvas in real time
           if (event.stepId) {
             setNodes((nds) =>
               nds.map((n) => {
@@ -373,17 +476,26 @@ export function App() {
           }
 
           if (event.eventType === 'WORKFLOW_FINISHED') {
+            isDone = true;
+            clearInterval(pollInterval);
             setIsRunning(false);
-            // Refresh execution object to obtain stepResults and reportPath
-            executionApi.getExecutionById(execution.id).then((fresh) => {
-              setActiveExecution(fresh);
-            });
+
+            // Hydrate immediately from event.details
+            if (event.details && (event.details as any).id) {
+              const finishedExec = event.details as WorkflowExecution;
+              setActiveExecution(finishedExec);
+              setWorkflowExecutions((prev) => [finishedExec, ...prev.filter((e) => e.id !== finishedExec.id)]);
+            } else {
+              executionApi.getExecutionById(execution.id).then((fresh) => {
+                setActiveExecution(fresh);
+                setWorkflowExecutions((prev) => [fresh, ...prev.filter((e) => e.id !== fresh.id)]);
+              });
+            }
             unsubscribe();
           }
         },
         (err) => {
-          console.error('SSE Error', err);
-          setIsRunning(false);
+          console.warn('SSE stream disconnected; relying on polling fallback', err);
         }
       );
     } catch (err) {
@@ -410,11 +522,13 @@ export function App() {
         onCreateNewWorkflow={() => setIsCreateModalOpen(true)}
         onOpenSettings={() => setIsSettingsModalOpen(true)}
         onSaveWorkflow={handleSaveWorkflow}
+        onDeleteWorkflow={handleDeleteWorkflow}
         onRunWorkflow={handleRunWorkflow}
         isRunning={isRunning}
         environment={environment}
         onEnvironmentChange={setEnvironment}
         latestExecution={activeExecution}
+        workflowExecutions={workflowExecutions}
         onViewReport={(url) => setReportModalUrl(url)}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -439,6 +553,7 @@ export function App() {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onReconnect={onReconnect}
             onNodeClick={handleNodeClick}
             onDropNewNode={handleDropNewNode}
           />
@@ -451,6 +566,8 @@ export function App() {
           selectedNode={selectedNode}
           onUpdateNodeData={handleUpdateNodeData}
           allNodes={allCanvasNodes}
+          edges={edges.map((e) => ({ id: e.id, source: e.source, target: e.target }))}
+          onDeleteEdge={handleDeleteEdge}
         />
       </div>
 
@@ -463,7 +580,7 @@ export function App() {
         onViewReport={(url) => setReportModalUrl(url)}
       />
 
-      {/* Embedded Karate HTML Report Modal */}
+      {/* Embedded Karate HTML & Profiling Report Modal */}
       <ReportViewerModal
         isOpen={!!reportModalUrl}
         onClose={() => setReportModalUrl(null)}
@@ -484,6 +601,7 @@ export function App() {
         onClose={() => setIsSettingsModalOpen(false)}
         workflow={selectedWorkflow}
         onSaveSettings={handleSaveWorkflowSettings}
+        onDeleteWorkflow={handleDeleteWorkflow}
       />
     </div>
   );
