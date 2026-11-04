@@ -1,0 +1,73 @@
+import React, { memo } from 'react';
+import { Handle, Position, NodeProps } from '@xyflow/react';
+import { Database, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { CanvasNodeData } from '../../../types/workflow';
+
+export const DbPollNode = memo(({ data, selected }: NodeProps<any>) => {
+  const nodeData = data as CanvasNodeData;
+  const status = nodeData.status;
+
+  return (
+    <div
+      className={`relative w-72 rounded-xl bg-slate-900/90 border p-3.5 shadow-xl backdrop-blur-md transition-all ${
+        selected ? 'border-amber-500 ring-2 ring-amber-500/30' : 'border-slate-800 hover:border-slate-700'
+      }`}
+    >
+      <Handle type="target" position={Position.Top} className="!bg-amber-500 !w-2.5 !h-2.5 !border-slate-900" />
+
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
+            <Database className="w-4 h-4" />
+          </div>
+          <span className="font-semibold text-xs text-slate-200 truncate">{nodeData.name || 'DB SQL Poll'}</span>
+        </div>
+
+        {/* Status Indicator */}
+        {status === 'RUNNING' && (
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-medium animate-pulse">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+            Polling
+          </div>
+        )}
+        {status === 'COMPLETED' && (
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px]">
+            <CheckCircle2 className="w-3 h-3" />
+            <span>Matched</span>
+          </div>
+        )}
+        {status === 'FAILED' && (
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-400 text-[10px]">
+            <XCircle className="w-3 h-3" />
+            <span>Timeout</span>
+          </div>
+        )}
+      </div>
+
+      {/* SQL Query Preview */}
+      <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800/80 mb-2.5">
+        <span className="text-[10px] font-mono text-amber-400/90 block mb-1">SQL Query:</span>
+        <p className="text-[11px] font-mono text-slate-400 truncate" title={nodeData.query}>
+          {nodeData.query || 'SELECT status FROM orders...'}
+        </p>
+      </div>
+
+      {/* Footer Details: Condition & Duration */}
+      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-800/60">
+        <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300/90 border border-amber-500/20 font-mono truncate max-w-[170px]">
+          {nodeData.condition || 'count > 0'}
+        </span>
+
+        {nodeData.durationMs !== undefined && (
+          <span className="flex items-center gap-1 font-mono text-slate-500">
+            <Clock className="w-2.5 h-2.5" />
+            {nodeData.durationMs}ms
+          </span>
+        )}
+      </div>
+
+      <Handle type="source" position={Position.Bottom} className="!bg-amber-500 !w-2.5 !h-2.5 !border-slate-900" />
+    </div>
+  );
+});

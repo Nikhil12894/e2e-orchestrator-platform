@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:orchestrator;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+
+orchestrator:
+  reports:
+    base-path: ./target/karate-reports-test

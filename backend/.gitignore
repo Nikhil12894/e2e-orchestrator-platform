@@ -1,0 +1,81 @@
+# ==========================================
+# Compiled Classes & Build Artifacts
+# ==========================================
+*.class
+*.log
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+hs_err_pid*
+
+# Maven build directory
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+
+# Gradle build directory
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Exceptions to keep Maven/Gradle wrappers tracked
+!/.mvn/wrapper/maven-wrapper.jar
+
+# ==========================================
+# IDE Specific Files (IntelliJ, Eclipse, VS Code)
+# ==========================================
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+.openidea/
+# Eclipse
+.metadata/
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+local.properties
+.settings/
+.loadpath
+.recommenders/
+.project
+.classpath
+.factorypath
+.springBeans
+.sts4-cache/
+
+# Visual Studio Code
+.vscode/
+
+# ==========================================
+# Operating System & Cache Files
+# ==========================================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+
+# ==========================================
+# Security & Local Environment Settings
+# ==========================================
+.env
+.env.local
+# Ignore local application property overrides if you use them for secrets
+application-local.properties
+application-local.yml
