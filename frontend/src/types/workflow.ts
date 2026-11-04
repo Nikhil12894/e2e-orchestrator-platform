@@ -84,6 +84,7 @@ export interface WorkflowStep {
   assertions?: StepAssertion[];
   extractions?: VariableExtraction[];
   continueOnFailure?: boolean;
+  excludeFromReport?: boolean;
 }
 
 export interface WorkflowAst {
@@ -113,6 +114,7 @@ export interface CanvasNodeData {
   jdbcUrl?: string;
   username?: string;
   password?: string;
+  driverClassName?: string;
   query?: string;
   condition?: string;
   bootstrapServers?: string;
@@ -122,6 +124,8 @@ export interface CanvasNodeData {
   delayMs?: number;
   assertions?: StepAssertion[];
   extractions?: VariableExtraction[];
+  continueOnFailure?: boolean;
+  excludeFromReport?: boolean;
   status?: ExecutionStatus;
   durationMs?: number;
 }
@@ -182,6 +186,7 @@ export interface ExecutionStepResult {
   assertionDetails: string[];
   extractedVariables: Record<string, any>;
   errorMessage?: string;
+  excludeFromReport?: boolean;
 }
 
 export interface WorkflowExecution {

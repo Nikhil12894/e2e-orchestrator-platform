@@ -398,15 +398,117 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
               {nodeType === 'dbPoll' && (
                 <>
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-300 mb-1">JDBC URL</label>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">Database Preset</label>
+                    <div className="grid grid-cols-4 gap-1.5 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => update({
+                          driverClassName: 'oracle.jdbc.OracleDriver',
+                          jdbcUrl: data.jdbcUrl?.includes('oracle') ? data.jdbcUrl : 'jdbc:oracle:thin:@//localhost:1521/XEPDB1'
+                        })}
+                        className={`px-2 py-1 rounded text-[10px] font-semibold border transition-all ${
+                          (data.driverClassName?.includes('oracle') || data.jdbcUrl?.includes('oracle'))
+                            ? 'bg-rose-500/20 text-rose-400 border-rose-500/40'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        Oracle (Thin)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => update({
+                          driverClassName: 'org.postgresql.Driver',
+                          jdbcUrl: data.jdbcUrl?.includes('postgresql') ? data.jdbcUrl : 'jdbc:postgresql://localhost:5432/e2e_orchestrator'
+                        })}
+                        className={`px-2 py-1 rounded text-[10px] font-semibold border transition-all ${
+                          (data.driverClassName?.includes('postgresql') || (!data.driverClassName && !data.jdbcUrl?.includes('oracle')))
+                            ? 'bg-blue-500/20 text-blue-400 border-blue-500/40'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        PostgreSQL
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => update({
+                          driverClassName: 'com.mysql.cj.jdbc.Driver',
+                          jdbcUrl: data.jdbcUrl?.includes('mysql') ? data.jdbcUrl : 'jdbc:mysql://localhost:3306/mydb'
+                        })}
+                        className={`px-2 py-1 rounded text-[10px] font-semibold border transition-all ${
+                          data.driverClassName?.includes('mysql') || data.jdbcUrl?.includes('mysql')
+                            ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        MySQL
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => update({
+                          driverClassName: 'org.h2.Driver',
+                          jdbcUrl: data.jdbcUrl?.includes('h2') ? data.jdbcUrl : 'jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1'
+                        })}
+                        className={`px-2 py-1 rounded text-[10px] font-semibold border transition-all ${
+                          data.driverClassName?.includes('h2') || data.jdbcUrl?.includes('h2')
+                            ? 'bg-purple-500/20 text-purple-400 border-purple-500/40'
+                            : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        H2
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] font-medium text-slate-300">JDBC URL</label>
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        {(data.jdbcUrl?.includes('oracle') || data.driverClassName?.includes('oracle')) ? 'Oracle ojdbc17' : 'Auto-detected'}
+                      </span>
+                    </div>
                     <input
                       type="text"
                       value={data.jdbcUrl || ''}
                       onChange={(e) => update({ jdbcUrl: e.target.value })}
-                      placeholder="jdbc:postgresql://localhost:5432/e2e_orchestrator"
+                      placeholder="jdbc:oracle:thin:@//localhost:1521/XEPDB1 or jdbc:postgresql://localhost:5432/db"
                       className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500"
                     />
                   </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-300 mb-1">DB Username</label>
+                      <input
+                        type="text"
+                        value={data.username || ''}
+                        onChange={(e) => update({ username: e.target.value })}
+                        placeholder="postgres / system"
+                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-medium text-slate-300">DB Password</label>
+                        <button
+                          type="button"
+                          onClick={() => openVarSelector('password')}
+                          className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-0.5"
+                          title="Insert Secret / Variable"
+                        >
+                          <Variable className="w-2.5 h-2.5" />
+                          Var
+                        </button>
+                      </div>
+                      <input
+                        type="password"
+                        value={data.password || ''}
+                        onChange={(e) => update({ password: e.target.value })}
+                        placeholder="${secrets.DB_PASS}"
+                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="text-[11px] font-medium text-slate-300">SQL Query</label>
@@ -427,6 +529,7 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                       className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-300 focus:outline-none focus:border-amber-500"
                     />
                   </div>
+
                   <div>
                     <label className="block text-[11px] font-medium text-slate-300 mb-1">Poll Match Condition</label>
                     <input
@@ -488,6 +591,48 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                   />
                 </div>
               )}
+
+              {/* Step Execution & Reporting Settings */}
+              <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3">
+                <span className="text-[11px] font-semibold text-slate-300 block">Execution & Reporting Options</span>
+
+                {/* Continue on Failure */}
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!data.continueOnFailure}
+                    onChange={(e) => update({ continueOnFailure: e.target.checked })}
+                    className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-900 text-blue-500 focus:ring-0 cursor-pointer"
+                  />
+                  <div>
+                    <span className="text-xs font-medium text-slate-200 block">Continue Workflow on Failure</span>
+                    <span className="text-[10px] text-slate-500 block leading-tight">
+                      Allow downstream steps to continue running even if this step fails.
+                    </span>
+                  </div>
+                </label>
+
+                {/* Exclude from Report */}
+                <label className="flex items-start gap-2.5 cursor-pointer pt-2 border-t border-slate-800/80">
+                  <input
+                    type="checkbox"
+                    checked={!!data.excludeFromReport}
+                    onChange={(e) => update({ excludeFromReport: e.target.checked })}
+                    className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-900 text-amber-500 focus:ring-0 cursor-pointer"
+                  />
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-medium text-slate-200">Exclude from Report & Metrics</span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                        Auxiliary Step
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 block leading-tight">
+                      Run this step normally for context/variables, but omit it from the report pass/fail scorecard and latency metrics.
+                    </span>
+                  </div>
+                </label>
+              </div>
 
               {/* Step Links & Connections */}
               <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2.5">

@@ -186,7 +186,14 @@ export const LiveExecutionConsole: React.FC<LiveExecutionConsoleProps> = ({
                           <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
                         )}
                         <div className="min-w-0">
-                          <span className="font-semibold text-xs block truncate">{step.stepName}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-xs block truncate">{step.stepName}</span>
+                            {step.excludeFromReport && (
+                              <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 shrink-0">
+                                Auxiliary
+                              </span>
+                            )}
+                          </div>
                           <span className="text-[10px] font-mono text-slate-500">{step.stepType}</span>
                         </div>
                       </div>
@@ -214,9 +221,16 @@ export const LiveExecutionConsole: React.FC<LiveExecutionConsoleProps> = ({
               {selectedStepResult ? (
                 <div className="space-y-3">
                   <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                      Step: {selectedStepResult.stepName} ({selectedStepResult.status})
-                    </span>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Step: {selectedStepResult.stepName} ({selectedStepResult.status})
+                      </span>
+                      {selectedStepResult.excludeFromReport && (
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                          Auxiliary (Uncounted in Report)
+                        </span>
+                      )}
+                    </div>
                     {selectedStepResult.errorMessage && (
                       <div className="p-2 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 text-[11px] mb-2">
                         {selectedStepResult.errorMessage}

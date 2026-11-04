@@ -17,6 +17,7 @@ public class WorkflowStep implements Serializable {
     private List<StepAssertion> assertions = new ArrayList<>();
     private List<VariableExtraction> extractions = new ArrayList<>();
     private boolean continueOnFailure = false;
+    private boolean excludeFromReport = false;
 
     public WorkflowStep() {}
 
@@ -52,4 +53,7 @@ public class WorkflowStep implements Serializable {
 
     public boolean isContinueOnFailure() { return continueOnFailure; }
     public void setContinueOnFailure(boolean continueOnFailure) { this.continueOnFailure = continueOnFailure; }
+
+    public boolean isExcludeFromReport() { return excludeFromReport; }
+    public void setExcludeFromReport(boolean excludeFromReport) { this.excludeFromReport = excludeFromReport; }
 }

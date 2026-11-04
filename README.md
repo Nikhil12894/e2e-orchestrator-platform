@@ -148,6 +148,35 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
+## 🐳 Docker Hub Build & Deployment
+
+### Build and Push Images to Docker Hub
+To build both frontend and backend Docker images and push them to your Docker Hub repository:
+
+```bash
+# Basic usage (defaults to tag: latest)
+./docker-build-push.sh <your-dockerhub-username>
+
+# With a specific version tag
+./docker-build-push.sh <your-dockerhub-username> 1.0.0
+
+# Multi-architecture build (linux/amd64 + linux/arm64) via Docker Buildx
+./docker-build-push.sh <your-dockerhub-username> 1.0.0 --multi-arch
+```
+
+### Run Anywhere from Docker Hub
+To run the platform on any server without cloning source code or installing compilers:
+
+```bash
+# 1. Download the preconfigured compose file
+curl -O https://raw.githubusercontent.com/nalinkumar/e2e-orchestrator-platform/main/docker-compose.hub.yml
+
+# 2. Run with Docker Compose (pulls published images automatically)
+DOCKER_USERNAME=<your-dockerhub-username> TAG=latest docker compose -f docker-compose.hub.yml up -d
+```
+
+---
+
 ## 🧪 Running Tests
 
 The test suite includes full unit and integration tests executing Karate tests against the in-memory bridge:

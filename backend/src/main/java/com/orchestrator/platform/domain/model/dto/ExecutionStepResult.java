@@ -24,6 +24,7 @@ public class ExecutionStepResult implements Serializable {
     private List<String> assertionDetails = new ArrayList<>();
     private Map<String, Object> extractedVariables = new HashMap<>();
     private String errorMessage;
+    private boolean excludeFromReport = false;
 
     public ExecutionStepResult() {}
 
@@ -68,4 +69,7 @@ public class ExecutionStepResult implements Serializable {
 
     public String getErrorMessage() { return errorMessage; }
     public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
+
+    public boolean isExcludeFromReport() { return excludeFromReport; }
+    public void setExcludeFromReport(boolean excludeFromReport) { this.excludeFromReport = excludeFromReport; }
 }

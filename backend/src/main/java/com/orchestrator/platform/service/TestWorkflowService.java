@@ -220,6 +220,8 @@ public class TestWorkflowService {
 
         Map<String, Object> data = node.getData() != null ? node.getData() : Collections.emptyMap();
         step.setName((String) data.getOrDefault("name", node.getId()));
+        step.setContinueOnFailure(Boolean.TRUE.equals(data.get("continueOnFailure")) || "true".equalsIgnoreCase(String.valueOf(data.get("continueOnFailure"))));
+        step.setExcludeFromReport(Boolean.TRUE.equals(data.get("excludeFromReport")) || "true".equalsIgnoreCase(String.valueOf(data.get("excludeFromReport"))));
 
         String nodeType = node.getType() != null ? node.getType().toLowerCase() : "httprequest";
 
@@ -249,6 +251,9 @@ public class TestWorkflowService {
             dbConfig.setJdbcUrl((String) data.getOrDefault("jdbcUrl", "jdbc:postgresql://localhost:5432/e2e_orchestrator"));
             dbConfig.setUsername((String) data.getOrDefault("username", "postgres"));
             dbConfig.setPassword((String) data.getOrDefault("password", "postgres"));
+            if (data.get("driverClassName") != null && !String.valueOf(data.get("driverClassName")).isBlank()) {
+                dbConfig.setDriverClassName(String.valueOf(data.get("driverClassName")).trim());
+            }
             dbConfig.setQuery((String) data.getOrDefault("query", "SELECT status FROM orders WHERE id = '${orderId}'"));
             dbConfig.setCondition((String) data.getOrDefault("condition", "row.status == 'COMPLETED'"));
             if (data.get("timeoutMs") != null) {

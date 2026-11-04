@@ -338,6 +338,8 @@ public class DynamicKarateBridge {
         stepResult.setAssertionDetails(assertionDetails != null ? assertionDetails : Collections.emptyList());
         stepResult.setExtractedVariables(extractedVars != null ? extractedVars : Collections.emptyMap());
         stepResult.setErrorMessage(errorMessage);
+        boolean exclude = Boolean.TRUE.equals(step.get("excludeFromReport")) || "true".equalsIgnoreCase(String.valueOf(step.get("excludeFromReport")));
+        stepResult.setExcludeFromReport(exclude);
 
         List<ExecutionStepResult> list = activeStepResults.computeIfAbsent(executionId, k -> Collections.synchronizedList(new ArrayList<>()));
         list.add(stepResult);

@@ -62,15 +62,20 @@ public class WorkflowReportGenerator {
         String triggerType = execution.getTriggerType() != null ? escapeHtml(execution.getTriggerType().name()) : "MANUAL";
         String startTimeStr = execution.getStartTime() != null ? DATE_FMT.format(execution.getStartTime()) : DATE_FMT.format(Instant.now());
 
-        List<ExecutionStepResult> stepResults = execution.getStepResults() != null ? execution.getStepResults() : Collections.emptyList();
-        int totalSteps = stepResults.size();
-        long passedSteps = stepResults.stream().filter(ExecutionStepResult::isAssertionsPassed).count();
+        List<ExecutionStepResult> allStepResults = execution.getStepResults() != null ? execution.getStepResults() : Collections.emptyList();
+        List<ExecutionStepResult> reportableSteps = allStepResults.stream().filter(s -> !s.isExcludeFromReport()).toList();
+        List<ExecutionStepResult> auxiliarySteps = allStepResults.stream().filter(ExecutionStepResult::isExcludeFromReport).toList();
+
+        // If user configured all steps as excluded, fallback to all steps to prevent empty metrics
+        List<ExecutionStepResult> scoredSteps = reportableSteps.isEmpty() ? allStepResults : reportableSteps;
+        int totalSteps = scoredSteps.size();
+        long passedSteps = scoredSteps.stream().filter(ExecutionStepResult::isAssertionsPassed).count();
         int healthPercentage = totalSteps > 0 ? (int) Math.round(((double) passedSteps / totalSteps) * 100) : 100;
 
-        // Bottleneck step identification
+        // Bottleneck step identification (profile all executed steps)
         ExecutionStepResult slowestStep = null;
         long maxStepDuration = -1;
-        for (ExecutionStepResult sr : stepResults) {
+        for (ExecutionStepResult sr : allStepResults) {
             long dur = sr.getDurationMs() != null ? sr.getDurationMs() : 0L;
             if (dur > maxStepDuration) {
                 maxStepDuration = dur;
@@ -123,6 +128,9 @@ public class WorkflowReportGenerator {
         html.append("      <div class=\"metric-box\">\n");
         html.append("        <span class=\"metric-label\">Steps Completed</span>\n");
         html.append("        <span class=\"metric-value\">").append(passedSteps).append(" / ").append(totalSteps).append("</span>\n");
+        if (!auxiliarySteps.isEmpty()) {
+            html.append("        <span class=\"metric-sub font-mono\">(").append(auxiliarySteps.size()).append(" auxiliary setup omitted)</span>\n");
+        }
         html.append("      </div>\n");
         html.append("      <div class=\"metric-box\">\n");
         html.append("        <span class=\"metric-label\">Success Rate</span>\n");
@@ -150,8 +158,8 @@ public class WorkflowReportGenerator {
         html.append("  <section class=\"panel\">\n");
         html.append("    <h3 class=\"panel-title\">⏱️ Step Latency Profiling Waterfall</h3>\n");
         html.append("    <div class=\"waterfall-container\">\n");
-        for (int i = 0; i < stepResults.size(); i++) {
-            ExecutionStepResult sr = stepResults.get(i);
+        for (int i = 0; i < allStepResults.size(); i++) {
+            ExecutionStepResult sr = allStepResults.get(i);
             long stepDur = sr.getDurationMs() != null ? sr.getDurationMs() : 0L;
             double stepPercent = totalDurationMs > 0 ? ((double) stepDur / totalDurationMs) * 100 : 0;
             double widthPercent = Math.max(stepPercent, 2.0); // minimum visual width
@@ -161,6 +169,9 @@ public class WorkflowReportGenerator {
             html.append("        <div class=\"waterfall-label\">\n");
             html.append("          <span class=\"step-num\">").append(i + 1).append("</span>\n");
             html.append("          <span class=\"step-name truncate\">").append(escapeHtml(sr.getStepName())).append("</span>\n");
+            if (sr.isExcludeFromReport()) {
+                html.append("          <span class=\"badge-aux font-mono\">AUXILIARY</span>\n");
+            }
             html.append("        </div>\n");
             html.append("        <div class=\"waterfall-bar-track\">\n");
             html.append("          <div class=\"waterfall-bar ").append(isBottleneck ? "bar-bottleneck" : "bar-normal").append("\" style=\"width: ").append(String.format(Locale.US, "%.1f", widthPercent)).append("%;\">\n");
@@ -178,8 +189,8 @@ public class WorkflowReportGenerator {
         html.append("    <h3 class=\"panel-title\">🔍 Step-by-Step Diagnostics & Payload Inspector</h3>\n");
         html.append("    <div class=\"steps-list\">\n");
 
-        for (int i = 0; i < stepResults.size(); i++) {
-            ExecutionStepResult sr = stepResults.get(i);
+        for (int i = 0; i < allStepResults.size(); i++) {
+            ExecutionStepResult sr = allStepResults.get(i);
             boolean stepPassed = sr.isAssertionsPassed() && sr.getStatus() == ExecutionStatus.COMPLETED;
             long stepDur = sr.getDurationMs() != null ? sr.getDurationMs() : 0L;
             String typeStr = sr.getStepType() != null ? sr.getStepType().name() : "HTTP_REQUEST";
@@ -188,6 +199,9 @@ public class WorkflowReportGenerator {
             html.append("        <summary class=\"step-summary\">\n");
             html.append("          <div class=\"step-left\">\n");
             html.append("            <span class=\"step-badge ").append(stepPassed ? "badge-pass" : "badge-fail").append("\">").append(stepPassed ? "✓ PASS" : "✕ FAIL").append("</span>\n");
+            if (sr.isExcludeFromReport()) {
+                html.append("            <span class=\"step-badge badge-aux\">UNCOUNTED / AUXILIARY</span>\n");
+            }
             html.append("            <span class=\"step-type-pill\">").append(typeStr).append("</span>\n");
             html.append("            <strong class=\"step-title\">").append(escapeHtml(sr.getStepName())).append("</strong>\n");
             html.append("          </div>\n");
@@ -452,6 +466,8 @@ public class WorkflowReportGenerator {
             .step-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 6px; }
             .badge-pass { background: rgba(16, 185, 129, 0.2); color: #34d399; }
             .badge-fail { background: rgba(244, 63, 94, 0.2); color: #fb7185; }
+            .badge-aux { background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px dashed rgba(148, 163, 184, 0.4); font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+            .metric-sub { font-size: 11px; color: #94a3b8; display: block; margin-top: 4px; }
             .step-type-pill { font-size: 10px; font-family: monospace; background: #1e293b; color: #94a3b8; padding: 2px 6px; border-radius: 4px; }
             .http-status-pill { font-size: 11px; font-family: monospace; font-weight: 600; padding: 2px 8px; border-radius: 6px; }
             .http-ok { background: rgba(16, 185, 129, 0.2); color: #34d399; }

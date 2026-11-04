@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: orchestrator-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: e2e_orchestrator
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d e2e_orchestrator"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - orchestrator-net
+
+  backend:
+    image: nikhil12894/e2e-orchestrator-backend:1.0.0
+    container_name: orchestrator-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/e2e_orchestrator
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_FLYWAY_ENABLED: "true"
+      ORCHESTRATOR_REPORTS_PATH: /app/reports
+    volumes:
+      - reports_data:/app/reports
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - orchestrator-net
+
+  frontend:
+    image: nikhil12894/e2e-orchestrator-frontend:1.0.0
+    container_name: orchestrator-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - orchestrator-net
+
+volumes:
+  pgdata:
+    driver: local
+  reports_data:
+    driver: local
+
+networks:
+  orchestrator-net:
+    driver: bridge

@@ -6,7 +6,7 @@ public class DbPollStepConfig implements Serializable {
     private String jdbcUrl;
     private String username;
     private String password;
-    private String driverClassName = "org.postgresql.Driver";
+    private String driverClassName;
     private String query;
     private Long pollIntervalMs = 1000L;
     private Long timeoutMs = 15000L;

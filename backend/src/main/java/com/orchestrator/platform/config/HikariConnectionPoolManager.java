@@ -45,6 +45,26 @@ public class HikariConnectionPoolManager {
         return results;
     }
 
+    public static String detectDriverClassName(String jdbcUrl, String explicitDriver) {
+        if (explicitDriver != null && !explicitDriver.trim().isEmpty()) {
+            return explicitDriver.trim();
+        }
+        if (jdbcUrl == null) return null;
+        String lower = jdbcUrl.toLowerCase().trim();
+        if (lower.startsWith("jdbc:oracle:")) {
+            return "oracle.jdbc.OracleDriver";
+        } else if (lower.startsWith("jdbc:postgresql:")) {
+            return "org.postgresql.Driver";
+        } else if (lower.startsWith("jdbc:mysql:")) {
+            return "com.mysql.cj.jdbc.Driver";
+        } else if (lower.startsWith("jdbc:h2:")) {
+            return "org.h2.Driver";
+        } else if (lower.startsWith("jdbc:sqlserver:")) {
+            return "com.microsoft.sqlserver.jdbc.SQLServerDriver";
+        }
+        return null;
+    }
+
     private synchronized HikariDataSource getOrCreateDataSource(String jdbcUrl, String username,
                                                                 String password, String driverClassName) {
         String key = jdbcUrl + "|" + (username != null ? username : "");
@@ -54,8 +74,11 @@ public class HikariConnectionPoolManager {
             config.setJdbcUrl(jdbcUrl);
             if (username != null) config.setUsername(username);
             if (password != null) config.setPassword(password);
-            if (driverClassName != null && !driverClassName.trim().isEmpty()) {
-                config.setDriverClassName(driverClassName);
+
+            String effectiveDriver = detectDriverClassName(jdbcUrl, driverClassName);
+            if (effectiveDriver != null && !effectiveDriver.trim().isEmpty()) {
+                config.setDriverClassName(effectiveDriver);
+                log.info("Configured JDBC driver: {} for URL: {}", effectiveDriver, jdbcUrl);
             }
             config.setMaximumPoolSize(5);
             config.setMinimumIdle(1);
