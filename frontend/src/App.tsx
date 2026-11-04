@@ -11,6 +11,8 @@ import {
 } from '@xyflow/react';
 
 import { Navbar } from './components/navbar/Navbar';
+import { CreateWorkflowModal } from './components/navbar/CreateWorkflowModal';
+import { WorkflowSettingsModal } from './components/navbar/WorkflowSettingsModal';
 import { ApiCatalogSidebar } from './components/catalog/ApiCatalogSidebar';
 import { FlowCanvas } from './components/canvas/FlowCanvas';
 import { NodeConfigDrawer } from './components/drawer/NodeConfigDrawer';
@@ -36,6 +38,8 @@ export function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   // Execution state
   const [environment, setEnvironment] = useState('default');
@@ -171,7 +175,7 @@ export function App() {
   };
 
   // Save current workflow
-  const handleSaveWorkflow = async () => {
+  const handleSaveWorkflow = async (extraPatch?: Partial<TestWorkflow>) => {
     if (!selectedWorkflow) return;
 
     const canvasNodes: CanvasNode[] = nodes.map((n) => ({
@@ -188,34 +192,101 @@ export function App() {
       animated: e.animated,
     }));
 
+    const currentCanvas = selectedWorkflow.canvasState || {
+      nodes: [],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    };
+
     try {
       const updated = await workflowApi.updateWorkflow(selectedWorkflow.id, {
-        name: selectedWorkflow.name,
-        description: selectedWorkflow.description,
+        name: extraPatch?.name ?? selectedWorkflow.name,
+        description: extraPatch?.description ?? selectedWorkflow.description,
         canvasState: {
           nodes: canvasNodes,
           edges: canvasEdges,
-          viewport: { x: 0, y: 0, zoom: 1 },
+          viewport: currentCanvas.viewport || { x: 0, y: 0, zoom: 1 },
+          variables: currentCanvas.variables,
+          defaultHeaders: extraPatch?.canvasState?.defaultHeaders ?? currentCanvas.defaultHeaders,
+          dynamicHeaders: extraPatch?.canvasState?.dynamicHeaders ?? currentCanvas.dynamicHeaders,
+          envProperties: extraPatch?.canvasState?.envProperties ?? currentCanvas.envProperties,
+          secrets: extraPatch?.canvasState?.secrets ?? currentCanvas.secrets,
         },
       });
 
       setSelectedWorkflow(updated);
       setWorkflows((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
+      return updated;
     } catch (err) {
       console.error('Failed to save workflow', err);
     }
   };
 
-  // Create new workflow
-  const handleCreateNewWorkflow = async () => {
+  // Create new workflow with custom name and template
+  const handleCreateCustomWorkflow = async (
+    name: string,
+    description: string,
+    template: 'blank' | 'ecommerce'
+  ) => {
     try {
+      let initNodes: CanvasNode[] = [];
+      let initEdges: CanvasEdge[] = [];
+
+      if (template === 'ecommerce') {
+        initNodes = [
+          {
+            id: 'step_auth',
+            type: 'httpRequest',
+            position: { x: 150, y: 150 },
+            data: {
+              name: 'User Authentication',
+              method: 'POST',
+              url: 'http://localhost:8080/api/v1/mock/auth/login',
+              body: { username: 'testuser@example.com', password: 'password123' },
+              expectedStatus: 200,
+              extractions: [
+                { variableName: 'authToken', source: 'RESPONSE_BODY', jsonPath: '$.token' },
+                { variableName: 'userId', source: 'RESPONSE_BODY', jsonPath: '$.userId' },
+              ],
+            },
+          },
+          {
+            id: 'step_order',
+            type: 'httpRequest',
+            position: { x: 150, y: 320 },
+            data: {
+              name: 'Submit New Order',
+              method: 'POST',
+              url: 'http://localhost:8080/api/v1/mock/orders',
+              headers: { Authorization: 'Bearer ${authToken}' },
+              body: { userId: '${userId}', items: ['SKU-882'], totalAmount: 149.99 },
+              expectedStatus: 201,
+              extractions: [
+                { variableName: 'orderId', source: 'RESPONSE_BODY', jsonPath: '$.orderId' },
+              ],
+            },
+          },
+        ];
+        initEdges = [
+          { id: 'e_auth_order', source: 'step_auth', target: 'step_order', animated: true },
+        ];
+      }
+
       const created = await workflowApi.createWorkflow({
-        name: `New Test Flow ${workflows.length + 1}`,
-        description: 'Visual E2E workflow built with React Flow and Karate execution engine',
+        name,
+        description: description || 'Custom end-to-end automated test workflow',
         canvasState: {
-          nodes: [],
-          edges: [],
+          nodes: initNodes,
+          edges: initEdges,
           viewport: { x: 0, y: 0, zoom: 1 },
+          defaultHeaders: { Accept: 'application/json', 'Content-Type': 'application/json' },
+          dynamicHeaders: { 'X-Request-Id': '${$randomUuid}' },
+          envProperties: {
+            default: { baseUrl: 'http://localhost:8080' },
+            staging: { baseUrl: 'https://staging.internal' },
+            production: { baseUrl: 'https://api.internal' },
+          },
+          secrets: {},
         },
       });
 
@@ -224,6 +295,29 @@ export function App() {
     } catch (err) {
       console.error('Failed to create workflow', err);
     }
+  };
+
+  // Handle saving workflow settings from WorkflowSettingsModal
+  const handleSaveWorkflowSettings = async (settings: {
+    name: string;
+    description: string;
+    defaultHeaders: Record<string, string>;
+    dynamicHeaders: Record<string, string>;
+    envProperties: Record<string, Record<string, any>>;
+    secrets: Record<string, string>;
+  }) => {
+    if (!selectedWorkflow) return;
+    await handleSaveWorkflow({
+      name: settings.name,
+      description: settings.description,
+      canvasState: {
+        ...(selectedWorkflow.canvasState || { nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } }),
+        defaultHeaders: settings.defaultHeaders,
+        dynamicHeaders: settings.dynamicHeaders,
+        envProperties: settings.envProperties,
+        secrets: settings.secrets,
+      },
+    });
   };
 
   // Run Workflow execution
@@ -313,7 +407,8 @@ export function App() {
         workflows={workflows}
         selectedWorkflow={selectedWorkflow}
         onSelectWorkflow={selectWorkflow}
-        onCreateNewWorkflow={handleCreateNewWorkflow}
+        onCreateNewWorkflow={() => setIsCreateModalOpen(true)}
+        onOpenSettings={() => setIsSettingsModalOpen(true)}
         onSaveWorkflow={handleSaveWorkflow}
         onRunWorkflow={handleRunWorkflow}
         isRunning={isRunning}
@@ -374,6 +469,21 @@ export function App() {
         onClose={() => setReportModalUrl(null)}
         reportUrl={reportModalUrl}
         workflowName={selectedWorkflow?.name || 'Workflow Run'}
+      />
+
+      {/* Create New Workflow Modal */}
+      <CreateWorkflowModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreate={handleCreateCustomWorkflow}
+      />
+
+      {/* Workflow Settings & Variables Modal */}
+      <WorkflowSettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        workflow={selectedWorkflow}
+        onSaveSettings={handleSaveWorkflowSettings}
       />
     </div>
   );

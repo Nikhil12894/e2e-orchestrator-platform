@@ -89,6 +89,10 @@ export interface WorkflowStep {
 export interface WorkflowAst {
   steps: WorkflowStep[];
   variables?: Record<string, any>;
+  defaultHeaders?: Record<string, string>;
+  dynamicHeaders?: Record<string, string>;
+  envProperties?: Record<string, Record<string, any>>;
+  secrets?: Record<string, string>;
   timeoutMs?: number;
 }
 
@@ -144,6 +148,11 @@ export interface CanvasState {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
   viewport: { x: number; y: number; zoom: number };
+  variables?: Record<string, any>;
+  defaultHeaders?: Record<string, string>;
+  dynamicHeaders?: Record<string, string>;
+  envProperties?: Record<string, Record<string, any>>;
+  secrets?: Record<string, string>;
 }
 
 export interface TestWorkflow {

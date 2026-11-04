@@ -21,13 +21,40 @@ public class ExecutionLogBroadcaster {
     private final Optional<SimpMessagingTemplate> messagingTemplate;
     private final Map<UUID, List<SseEmitter>> sseEmitters = new ConcurrentHashMap<>();
     private final Map<UUID, List<ExecutionEventDto>> eventHistory = new ConcurrentHashMap<>();
+    private final Map<UUID, Set<String>> registeredSecrets = new ConcurrentHashMap<>();
 
     public ExecutionLogBroadcaster(Optional<SimpMessagingTemplate> messagingTemplate) {
         this.messagingTemplate = messagingTemplate;
     }
 
+    public void registerSecrets(UUID executionId, Collection<String> secretValues) {
+        if (executionId == null || secretValues == null || secretValues.isEmpty()) return;
+        Set<String> set = registeredSecrets.computeIfAbsent(executionId, k -> ConcurrentHashMap.newKeySet());
+        for (String s : secretValues) {
+            if (s != null && !s.trim().isEmpty()) {
+                set.add(s.trim());
+            }
+        }
+    }
+
+    public String maskSecrets(UUID executionId, String text) {
+        if (text == null || executionId == null) return text;
+        Set<String> secrets = registeredSecrets.get(executionId);
+        if (secrets == null || secrets.isEmpty()) return text;
+        String result = text;
+        for (String secret : secrets) {
+            if (!secret.isEmpty() && result.contains(secret)) {
+                result = result.replace(secret, "[REDACTED]");
+            }
+        }
+        return result;
+    }
+
     public void broadcast(ExecutionEventDto event) {
         UUID executionId = event.getExecutionId();
+        if (event.getMessage() != null && executionId != null) {
+            event.setMessage(maskSecrets(executionId, event.getMessage()));
+        }
         log.info("[Execution {}] {} - {}: {}", executionId, event.getEventType(), event.getStepName(), event.getMessage());
 
         // Cache event in history (keep last 500 events per execution)

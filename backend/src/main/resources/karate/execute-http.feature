@@ -7,11 +7,14 @@ Feature: Execute HTTP Request Step
     * def httpMethod = (httpCfg.method || 'GET').toLowerCase()
     * def expectedStatus = httpCfg.expectedStatus || 200
     * def continueOnFailure = resolvedStep.continueOnFailure || false
+    * def fHeaders = karate.get('flowHeaders') || {}
+    * def sHeaders = httpCfg.headers || {}
+    * def mergedHeaders = karate.merge(fHeaders, sHeaders)
 
   Scenario: Run HTTP Step
     * if (continueOnFailure) karate.configure('continueOnStepFailure', true)
     * url httpCfg.url
-    * headers httpCfg.headers || {}
+    * headers mergedHeaders
     * params httpCfg.params || {}
     * def reqBody = (httpMethod == 'get' || httpMethod == 'delete') ? null : httpCfg.body
     * request reqBody

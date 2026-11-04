@@ -6,6 +6,7 @@ Feature: Generic Dynamic Workflow Orchestrator
     * def executionId = karate.properties['karate.executionId'] || java.lang.System.getProperty('karate.executionId')
     * def payload = Bridge.getActiveWorkflowPayload(executionId)
     * def workflowId = payload.workflowId
+    * def flowHeaders = payload.flowHeaders || {}
     * def steps = payload.steps || []
     * def globalContext = payload.initialVariables || {}
 
@@ -24,6 +25,7 @@ Feature: Generic Dynamic Workflow Orchestrator
           step: stepItem,
           executionId: executionId,
           stepIndex: idx,
+          flowHeaders: flowHeaders,
           globalContext: globalContext
         };
         var stepResult = karate.call(executeStepFeature, callArgs);

@@ -10,6 +10,7 @@ import com.orchestrator.platform.domain.model.ast.WorkflowAst;
 import com.orchestrator.platform.domain.model.dto.ExecutionEventDto;
 import com.orchestrator.platform.domain.model.dto.ExecutionStepResult;
 import com.orchestrator.platform.repository.WorkflowExecutionRepository;
+import com.orchestrator.platform.service.WorkflowContextEngine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,13 +34,16 @@ public class DynamicKarateRunner {
     private final WorkflowExecutionRepository executionRepository;
     private final ExecutionLogBroadcaster logBroadcaster;
     private final ObjectMapper objectMapper;
+    private final WorkflowContextEngine contextEngine;
 
     public DynamicKarateRunner(WorkflowExecutionRepository executionRepository,
                                ExecutionLogBroadcaster logBroadcaster,
-                               ObjectMapper objectMapper) {
+                               ObjectMapper objectMapper,
+                               WorkflowContextEngine contextEngine) {
         this.executionRepository = executionRepository;
         this.logBroadcaster = logBroadcaster;
         this.objectMapper = objectMapper;
+        this.contextEngine = contextEngine;
     }
 
     public WorkflowExecutionEntity executeWorkflow(WorkflowExecutionEntity execution,
@@ -66,11 +70,49 @@ public class DynamicKarateRunner {
         // Initialize variables and context in the Bridge
         Map<String, Object> mergedVariables = new HashMap<>();
         WorkflowAst ast = workflow.getWorkflowAst();
+
+        // 1. Environment Properties
+        String selectedEnv = (environment != null && !environment.isBlank()) ? environment : "default";
+        if (ast != null && ast.getEnvProperties() != null) {
+            Map<String, Object> envVars = ast.getEnvProperties().get(selectedEnv);
+            if (envVars != null) {
+                mergedVariables.putAll(envVars);
+                mergedVariables.put("env", envVars);
+            }
+        }
+
+        // 2. Global Workflow Variables
         if (ast != null && ast.getVariables() != null) {
             mergedVariables.putAll(ast.getVariables());
         }
+
+        // 3. Secrets (Inject into context & register for redaction)
+        if (ast != null && ast.getSecrets() != null && !ast.getSecrets().isEmpty()) {
+            mergedVariables.putAll(ast.getSecrets());
+            logBroadcaster.registerSecrets(executionId, ast.getSecrets().values());
+        }
+
+        // 4. Trigger Request Initial Variables
         if (initialVariables != null) {
             mergedVariables.putAll(initialVariables);
+        }
+
+        // 5. Evaluate Flow-Level Headers & Dynamic Headers (once per execution!)
+        Map<String, String> resolvedFlowHeaders = new LinkedHashMap<>();
+        if (ast != null && ast.getDefaultHeaders() != null) {
+            for (Map.Entry<String, String> entry : ast.getDefaultHeaders().entrySet()) {
+                String resolvedVal = contextEngine.resolveString(entry.getValue(), mergedVariables);
+                resolvedFlowHeaders.put(entry.getKey(), resolvedVal);
+            }
+        }
+        if (ast != null && ast.getDynamicHeaders() != null) {
+            for (Map.Entry<String, String> entry : ast.getDynamicHeaders().entrySet()) {
+                // Dynamic header evaluated ONCE for the entire workflow run
+                String resolvedVal = contextEngine.resolveString(entry.getValue(), mergedVariables);
+                resolvedFlowHeaders.put(entry.getKey(), resolvedVal);
+                // Also cache in context so steps can reference as ${headerName}
+                mergedVariables.put(entry.getKey(), resolvedVal);
+            }
         }
 
         // Build runtime payload for generic-flow-executor.feature
@@ -78,6 +120,7 @@ public class DynamicKarateRunner {
         workflowPayload.put("executionId", executionId.toString());
         workflowPayload.put("workflowId", workflow.getId().toString());
         workflowPayload.put("workflowName", workflow.getName());
+        workflowPayload.put("flowHeaders", resolvedFlowHeaders);
 
         List<?> stepList = Collections.emptyList();
         if (ast != null && ast.getSteps() != null) {
@@ -147,7 +190,10 @@ public class DynamicKarateRunner {
         }
 
         if (karateResults != null && karateResults.getErrors() != null && !karateResults.getErrors().isEmpty()) {
-            finalExecution.setErrorMessage(String.join("\n", karateResults.getErrors()));
+            String rawErrors = String.join("\n", karateResults.getErrors());
+            finalExecution.setErrorMessage(logBroadcaster.maskSecrets(executionId, rawErrors));
+        } else if (finalExecution.getErrorMessage() != null) {
+            finalExecution.setErrorMessage(logBroadcaster.maskSecrets(executionId, finalExecution.getErrorMessage()));
         }
 
         WorkflowExecutionEntity saved = executionRepository.saveAndFlush(finalExecution);

@@ -5,13 +5,14 @@ Feature: Dynamic Step Executor
     * def Bridge = Java.type('com.orchestrator.platform.service.execution.DynamicKarateBridge')
     * def resolvedStep = Bridge.resolveStepVariables(executionId, step, globalContext)
     * def stepType = resolvedStep.type + ''
+    * def flowHeaders = karate.get('flowHeaders') || {}
 
   Scenario: Execute Step By Type
     * eval Bridge.onStepStart(executionId, resolvedStep.id, resolvedStep.name, stepType)
     * def stepRes = null
 
     # Branch 1: HTTP API Request
-    * if (stepType == 'HTTP_REQUEST') karate.set('stepRes', karate.call('classpath:karate/execute-http.feature', { resolvedStep: resolvedStep, executionId: executionId }))
+    * if (stepType == 'HTTP_REQUEST') karate.set('stepRes', karate.call('classpath:karate/execute-http.feature', { resolvedStep: resolvedStep, executionId: executionId, flowHeaders: flowHeaders }))
 
     # Branch 2: Database Polling via HikariCP
     * if (stepType == 'DB_POLL') karate.set('stepRes', karate.call('classpath:karate/execute-db.feature', { resolvedStep: resolvedStep, executionId: executionId }))

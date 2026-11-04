@@ -9,7 +9,8 @@ import {
   Server,
   Sparkles,
   Check,
-  ChevronDown
+  ChevronDown,
+  Sliders
 } from 'lucide-react';
 import { TestWorkflow, WorkflowExecution } from '../../types/workflow';
 
@@ -18,6 +19,7 @@ interface NavbarProps {
   selectedWorkflow: TestWorkflow | null;
   onSelectWorkflow: (workflow: TestWorkflow) => void;
   onCreateNewWorkflow: () => void;
+  onOpenSettings: () => void;
   onSaveWorkflow: () => void;
   onRunWorkflow: () => void;
   isRunning: boolean;
@@ -36,6 +38,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   selectedWorkflow,
   onSelectWorkflow,
   onCreateNewWorkflow,
+  onOpenSettings,
   onSaveWorkflow,
   onRunWorkflow,
   isRunning,
@@ -80,7 +83,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Middle: Workflow Selector & New Workflow */}
+      {/* Middle: Workflow Selector, New Workflow, Settings, Save */}
       <div className="flex items-center gap-2">
         <div className="relative">
           <select
@@ -102,11 +105,20 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         <button
           onClick={onCreateNewWorkflow}
-          title="Create New Workflow"
+          title="Create New Workflow with Custom Name"
           className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700 bg-slate-950 text-slate-300 hover:text-white text-xs font-medium transition-colors"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="w-3.5 h-3.5 text-blue-400" />
           <span className="hidden md:inline">New Flow</span>
+        </button>
+
+        <button
+          onClick={onOpenSettings}
+          title="Workflow Settings, Headers, Dynamic Macros & Secrets"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700 bg-slate-950 text-slate-300 hover:text-white text-xs font-medium transition-colors"
+        >
+          <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+          <span className="hidden md:inline">Settings</span>
         </button>
 
         <button
@@ -114,7 +126,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           title="Save Flow Changes"
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700 bg-slate-950 text-slate-300 hover:text-white text-xs font-medium transition-colors"
         >
-          <Save className="w-3.5 h-3.5 text-blue-400" />
+          <Save className="w-3.5 h-3.5 text-emerald-400" />
           <span className="hidden md:inline">Save</span>
         </button>
       </div>

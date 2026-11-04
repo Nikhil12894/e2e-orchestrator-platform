@@ -58,6 +58,15 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
       update({ query: (data.query || '') + varExpr });
     } else if (varTargetField === 'condition') {
       update({ condition: (data.condition || '') + varExpr });
+    } else if (varTargetField.startsWith('header_')) {
+      const hKey = varTargetField.substring(7);
+      const currentVal = (data.headers || {})[hKey] || '';
+      update({
+        headers: {
+          ...(data.headers || {}),
+          [hKey]: currentVal + varExpr,
+        },
+      });
     } else if (varTargetField === 'body') {
       try {
         const bodyStr = typeof data.body === 'string' ? data.body : JSON.stringify(data.body, null, 2);
@@ -245,6 +254,108 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                       onChange={(e) => update({ expectedStatus: parseInt(e.target.value) || 200 })}
                       className="w-28 px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-blue-500"
                     />
+                  </div>
+
+                  {/* Step HTTP Headers */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-300">HTTP Headers</label>
+                        <span className="text-[10px] text-slate-500">Overrides workflow global headers</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = { ...(data.headers || {}) };
+                          current[`Header-${Object.keys(current).length + 1}`] = '';
+                          update({ headers: current });
+                        }}
+                        className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Add Header
+                      </button>
+                    </div>
+
+                    {Object.keys(data.headers || {}).length === 0 ? (
+                      <div className="p-3 bg-slate-950/60 border border-dashed border-slate-800 rounded-lg text-center">
+                        <p className="text-[10px] text-slate-500 mb-1">Inheriting workflow-level headers.</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            update({
+                              headers: {
+                                ...(data.headers || {}),
+                                Authorization: 'Bearer ${authToken}',
+                              },
+                            });
+                          }}
+                          className="text-[10px] text-blue-400 hover:underline"
+                        >
+                          + Add Authorization: Bearer {'${authToken}'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {Object.entries(data.headers || {}).map(([hKey, hVal], hIdx) => (
+                          <div key={hIdx} className="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              value={hKey}
+                              placeholder="Header-Name"
+                              onChange={(e) => {
+                                const newKey = e.target.value;
+                                const newHeaders: Record<string, string> = {};
+                                Object.entries(data.headers || {}).forEach(([k, v]) => {
+                                  if (k === hKey) {
+                                    newHeaders[newKey] = v;
+                                  } else {
+                                    newHeaders[k] = v;
+                                  }
+                                });
+                                update({ headers: newHeaders });
+                              }}
+                              className="w-1/2 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
+                            />
+                            <div className="flex-1 relative">
+                              <input
+                                type="text"
+                                value={hVal}
+                                placeholder="Header-Value"
+                                onChange={(e) => {
+                                  update({
+                                    headers: {
+                                      ...(data.headers || {}),
+                                      [hKey]: e.target.value,
+                                    },
+                                  });
+                                }}
+                                className="w-full pr-6 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => openVarSelector(`header_${hKey}`)}
+                                title="Insert Variable"
+                                className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-500 hover:text-emerald-400"
+                              >
+                                <Variable className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newHeaders = { ...(data.headers || {}) };
+                                delete newHeaders[hKey];
+                                update({ headers: newHeaders });
+                              }}
+                              className="p-1 text-slate-500 hover:text-red-400"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* JSON Body editor */}

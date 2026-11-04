@@ -3,6 +3,7 @@ package com.orchestrator.platform.service;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -63,7 +64,22 @@ public class TestWorkflowService {
 
         // Derive AST from canvas state if not explicitly supplied
         if (request.getWorkflowAst() != null && request.getWorkflowAst().getSteps() != null && !request.getWorkflowAst().getSteps().isEmpty()) {
-            entity.setWorkflowAst(request.getWorkflowAst());
+            WorkflowAst ast = request.getWorkflowAst();
+            if (request.getCanvasState() != null) {
+                if (ast.getDefaultHeaders().isEmpty() && !request.getCanvasState().getDefaultHeaders().isEmpty()) {
+                    ast.setDefaultHeaders(new LinkedHashMap<>(request.getCanvasState().getDefaultHeaders()));
+                }
+                if (ast.getDynamicHeaders().isEmpty() && !request.getCanvasState().getDynamicHeaders().isEmpty()) {
+                    ast.setDynamicHeaders(new LinkedHashMap<>(request.getCanvasState().getDynamicHeaders()));
+                }
+                if (ast.getEnvProperties().isEmpty() && !request.getCanvasState().getEnvProperties().isEmpty()) {
+                    ast.setEnvProperties(new LinkedHashMap<>(request.getCanvasState().getEnvProperties()));
+                }
+                if (ast.getSecrets().isEmpty() && !request.getCanvasState().getSecrets().isEmpty()) {
+                    ast.setSecrets(new LinkedHashMap<>(request.getCanvasState().getSecrets()));
+                }
+            }
+            entity.setWorkflowAst(ast);
         } else if (request.getCanvasState() != null) {
             entity.setWorkflowAst(deriveAstFromCanvas(request.getCanvasState()));
         } else {
@@ -86,7 +102,22 @@ public class TestWorkflowService {
             entity.setWorkflowAst(deriveAstFromCanvas(request.getCanvasState()));
         }
         if (request.getWorkflowAst() != null && request.getWorkflowAst().getSteps() != null && !request.getWorkflowAst().getSteps().isEmpty()) {
-            entity.setWorkflowAst(request.getWorkflowAst());
+            WorkflowAst ast = request.getWorkflowAst();
+            if (request.getCanvasState() != null) {
+                if (ast.getDefaultHeaders().isEmpty() && !request.getCanvasState().getDefaultHeaders().isEmpty()) {
+                    ast.setDefaultHeaders(new LinkedHashMap<>(request.getCanvasState().getDefaultHeaders()));
+                }
+                if (ast.getDynamicHeaders().isEmpty() && !request.getCanvasState().getDynamicHeaders().isEmpty()) {
+                    ast.setDynamicHeaders(new LinkedHashMap<>(request.getCanvasState().getDynamicHeaders()));
+                }
+                if (ast.getEnvProperties().isEmpty() && !request.getCanvasState().getEnvProperties().isEmpty()) {
+                    ast.setEnvProperties(new LinkedHashMap<>(request.getCanvasState().getEnvProperties()));
+                }
+                if (ast.getSecrets().isEmpty() && !request.getCanvasState().getSecrets().isEmpty()) {
+                    ast.setSecrets(new LinkedHashMap<>(request.getCanvasState().getSecrets()));
+                }
+            }
+            entity.setWorkflowAst(ast);
         }
         entity.setVersion(entity.getVersion() + 1);
 
@@ -166,6 +197,13 @@ public class TestWorkflowService {
         }
 
         ast.setSteps(steps);
+        if (canvasState != null) {
+            if (canvasState.getDefaultHeaders() != null) ast.setDefaultHeaders(new LinkedHashMap<>(canvasState.getDefaultHeaders()));
+            if (canvasState.getDynamicHeaders() != null) ast.setDynamicHeaders(new LinkedHashMap<>(canvasState.getDynamicHeaders()));
+            if (canvasState.getEnvProperties() != null) ast.setEnvProperties(new LinkedHashMap<>(canvasState.getEnvProperties()));
+            if (canvasState.getSecrets() != null) ast.setSecrets(new LinkedHashMap<>(canvasState.getSecrets()));
+            if (canvasState.getVariables() != null) ast.setVariables(new HashMap<>(canvasState.getVariables()));
+        }
         return ast;
     }
 
