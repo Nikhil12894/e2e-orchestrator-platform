@@ -20,7 +20,7 @@ services:
       - orchestrator-net
 
   backend:
-    image: nikhil12894/e2e-orchestrator-backend:1.0.0
+    image: nikhil12894/e2e-orchestrator-backend:2.0.0
     container_name: orchestrator-backend
     restart: unless-stopped
     ports:
@@ -50,7 +50,7 @@ services:
       - orchestrator-net
 
   frontend:
-    image: nikhil12894/e2e-orchestrator-frontend:1.0.0
+    image: nikhil12894/e2e-orchestrator-frontend:2.0.0
     container_name: orchestrator-frontend
     restart: unless-stopped
     ports:

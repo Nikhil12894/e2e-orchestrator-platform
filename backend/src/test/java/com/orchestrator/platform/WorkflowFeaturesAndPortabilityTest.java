@@ -26,6 +26,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.nio.file.Path;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -253,5 +254,38 @@ public class WorkflowFeaturesAndPortabilityTest {
         String feature = workflowService.generateStandaloneKarateFeature(wf.getId());
         assertTrue(feature.contains("configure retry = { count: 3, interval: 1200 }"));
         assertTrue(feature.contains("retry until responseStatus =="));
+    }
+
+    @Test
+    @DisplayName("Verify self-healing fallback when configured reports path throws AccessDeniedException")
+    public void testSelfHealingFallbackWhenReportPathNotWritable() {
+        TestWorkflowEntity wf = new TestWorkflowEntity();
+        wf.setName("Fallback Test Flow");
+        wf.setVersion(1);
+
+        WorkflowAst ast = new WorkflowAst();
+        WorkflowStep step = new WorkflowStep();
+        step.setId("step_fallback");
+        step.setName("Transform Step");
+        step.setType(StepType.TRANSFORM);
+        step.setEnabled(true);
+        TransformStepConfig transCfg = new TransformStepConfig();
+        transCfg.setScript("function(ctx) { return { fallbackWorked: true }; }");
+        step.setTransformConfig(transCfg);
+        ast.setSteps(List.of(step));
+        wf.setWorkflowAst(ast);
+        wf = workflowRepository.saveAndFlush(wf);
+
+        WorkflowExecutionEntity exec = new WorkflowExecutionEntity();
+        exec.setWorkflowId(wf.getId());
+        exec.setWorkflowName(wf.getName());
+        exec.setStatus(ExecutionStatus.PENDING);
+        exec = executionRepository.saveAndFlush(exec);
+
+        WorkflowExecutionEntity finished = karateRunner.executeWorkflow(exec, wf, new HashMap<>(), "default");
+        assertEquals(ExecutionStatus.COMPLETED, finished.getStatus());
+        Path reportDir = karateRunner.getReportDir(finished.getId());
+        assertNotNull(reportDir);
+        assertTrue(java.nio.file.Files.exists(reportDir));
     }
 }

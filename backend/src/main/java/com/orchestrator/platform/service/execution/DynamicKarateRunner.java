@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class DynamicKarateRunner {
@@ -38,6 +39,7 @@ public class DynamicKarateRunner {
     private final ObjectMapper objectMapper;
     private final WorkflowContextEngine contextEngine;
     private final WorkflowReportGenerator reportGenerator;
+    private final Map<UUID, Path> activeReportDirs = new ConcurrentHashMap<>();
 
     public DynamicKarateRunner(WorkflowExecutionRepository executionRepository,
                                ExecutionLogBroadcaster logBroadcaster,
@@ -64,13 +66,8 @@ public class DynamicKarateRunner {
         currentExecution.setStartTime(Instant.ofEpochMilli(startTime));
         currentExecution = executionRepository.saveAndFlush(currentExecution);
 
-        // Prepare execution report directory
-        Path reportDir = Paths.get(reportsBasePath, executionId.toString()).toAbsolutePath().normalize();
-        try {
-            Files.createDirectories(reportDir);
-        } catch (Exception e) {
-            log.error("Failed to create report directory: {}", reportDir, e);
-        }
+        // Prepare execution report directory (with resilient fallback to java.io.tmpdir on permission errors)
+        Path reportDir = resolveReportDir(executionId);
 
         // Initialize variables and context in the Bridge
         Map<String, Object> mergedVariables = new HashMap<>();
@@ -140,8 +137,7 @@ public class DynamicKarateRunner {
         SuiteResult karateResults = null;
         try {
             // Dynamically generate feature attributed to this specific workflow in a dedicated staging directory
-            Path featuresDir = reportDir.resolveSibling("karate-features").resolve(executionId.toString());
-            Files.createDirectories(featuresDir);
+            Path featuresDir = resolveFeaturesDir(reportDir, executionId);
             Path featureFile = featuresDir.resolve("workflow-execution.feature");
             String featureContent = buildDynamicFeatureContent(workflow, environment);
             Files.writeString(featureFile, featureContent, StandardCharsets.UTF_8);
@@ -221,31 +217,92 @@ public class DynamicKarateRunner {
         return saved;
     }
 
+    private Path resolveReportDir(UUID executionId) {
+        Path primaryDir = Paths.get(reportsBasePath, executionId.toString()).toAbsolutePath().normalize();
+        try {
+            Files.createDirectories(primaryDir);
+            activeReportDirs.put(executionId, primaryDir);
+            return primaryDir;
+        } catch (Exception e) {
+            log.warn("Cannot create primary report directory at {} ({}). Falling back to system temporary directory.",
+                    primaryDir, e.getMessage());
+            Path fallbackDir = Paths.get(System.getProperty("java.io.tmpdir", "/tmp"), "orchestrator-reports", executionId.toString()).toAbsolutePath().normalize();
+            try {
+                Files.createDirectories(fallbackDir);
+                activeReportDirs.put(executionId, fallbackDir);
+                return fallbackDir;
+            } catch (Exception ex) {
+                log.error("Failed to create fallback report directory {}: {}", fallbackDir, ex.getMessage(), ex);
+                activeReportDirs.put(executionId, primaryDir);
+                return primaryDir;
+            }
+        }
+    }
+
+    private Path resolveFeaturesDir(Path reportDir, UUID executionId) {
+        try {
+            Path featuresDir = reportDir.resolveSibling("karate-features").resolve(executionId.toString());
+            Files.createDirectories(featuresDir);
+            return featuresDir;
+        } catch (Exception e) {
+            log.warn("Cannot create features directory adjacent to {} ({}). Falling back to system temporary directory.",
+                    reportDir, e.getMessage());
+            Path fallbackFeaturesDir = Paths.get(System.getProperty("java.io.tmpdir", "/tmp"), "karate-features", executionId.toString()).toAbsolutePath().normalize();
+            try {
+                Files.createDirectories(fallbackFeaturesDir);
+                return fallbackFeaturesDir;
+            } catch (Exception ex) {
+                log.error("Failed to create fallback features directory {}: {}", fallbackFeaturesDir, ex.getMessage(), ex);
+                return reportDir;
+            }
+        }
+    }
+
     public Path getReportDir(UUID executionId) {
-        return Paths.get(reportsBasePath, executionId.toString()).toAbsolutePath().normalize();
+        if (executionId != null && activeReportDirs.containsKey(executionId)) {
+            Path cached = activeReportDirs.get(executionId);
+            if (Files.exists(cached)) {
+                return cached;
+            }
+        }
+        Path primary = Paths.get(reportsBasePath, executionId != null ? executionId.toString() : "").toAbsolutePath().normalize();
+        if (Files.exists(primary)) {
+            return primary;
+        }
+        Path fallback = Paths.get(System.getProperty("java.io.tmpdir", "/tmp"), "orchestrator-reports", executionId != null ? executionId.toString() : "").toAbsolutePath().normalize();
+        if (Files.exists(fallback)) {
+            return fallback;
+        }
+        return primary;
     }
 
     public void deleteExecutionFiles(UUID executionId) {
         if (executionId == null) {
             return;
         }
-        Path reportDir = getReportDir(executionId);
-        Path featuresDir = reportDir.resolveSibling("karate-features").resolve(executionId.toString());
+        activeReportDirs.remove(executionId);
+
+        // Clean configured reportsBasePath
+        Path primaryDir = Paths.get(reportsBasePath, executionId.toString()).toAbsolutePath().normalize();
+        Path primaryFeaturesDir = primaryDir.resolveSibling("karate-features").resolve(executionId.toString());
+        cleanDir(primaryDir);
+        cleanDir(primaryFeaturesDir);
+
+        // Also clean up any fallback directories
+        Path fallbackDir = Paths.get(System.getProperty("java.io.tmpdir", "/tmp"), "orchestrator-reports", executionId.toString()).toAbsolutePath().normalize();
+        Path fallbackFeaturesDir = Paths.get(System.getProperty("java.io.tmpdir", "/tmp"), "karate-features", executionId.toString()).toAbsolutePath().normalize();
+        cleanDir(fallbackDir);
+        cleanDir(fallbackFeaturesDir);
+    }
+
+    private void cleanDir(Path path) {
         try {
-            if (Files.exists(reportDir)) {
-                FileSystemUtils.deleteRecursively(reportDir);
-                log.info("Deleted report directory for execution {}", executionId);
+            if (Files.exists(path)) {
+                FileSystemUtils.deleteRecursively(path);
+                log.info("Deleted directory: {}", path);
             }
         } catch (Exception e) {
-            log.warn("Failed to delete report dir for execution {}: {}", executionId, e.getMessage());
-        }
-        try {
-            if (Files.exists(featuresDir)) {
-                FileSystemUtils.deleteRecursively(featuresDir);
-                log.info("Deleted features directory for execution {}", executionId);
-            }
-        } catch (Exception e) {
-            log.warn("Failed to delete features dir for execution {}: {}", executionId, e.getMessage());
+            log.warn("Failed to delete directory {}: {}", path, e.getMessage());
         }
     }
 

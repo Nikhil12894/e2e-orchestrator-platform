@@ -7,7 +7,7 @@ WORKDIR /build
 
 # Build minimal custom JRE via jlink (shrinks JRE footprint from 225MB to ~55MB)
 RUN $JAVA_HOME/bin/jlink \
-    --add-modules java.base,java.compiler,java.desktop,java.instrument,java.management,java.naming,java.net.http,java.prefs,java.rmi,java.scripting,java.security.jgss,java.security.sasl,java.sql,java.sql.rowset,java.transaction.xa,java.xml,java.xml.crypto,jdk.unsupported,jdk.crypto.ec,jdk.management,jdk.zipfs \
+    --add-modules java.base,java.compiler,java.desktop,java.instrument,java.management,java.naming,java.net.http,java.prefs,java.rmi,java.scripting,java.security.jgss,java.security.sasl,java.sql,java.sql.rowset,java.transaction.xa,java.xml,java.xml.crypto,jdk.unsupported,jdk.crypto.ec,jdk.management,jdk.zipfs,jdk.net,jdk.charsets,jdk.crypto.cryptoki,jdk.naming.dns,jdk.security.auth,jdk.dynalink \
     --strip-debug \
     --no-man-pages \
     --no-header-files \
@@ -31,8 +31,8 @@ RUN java -Djarmode=tools -jar /build/target/e2e-orchestrator-platform-1.0.0-SNAP
 # ==============================================================================
 FROM alpine:latest
 
-# Install runtime dependencies: musl-locales, curl (for healthchecks), tzdata, ca-certificates
-RUN apk add --no-cache curl tzdata musl-locales ca-certificates
+# Install runtime dependencies: musl-locales, curl (for healthchecks), tzdata, ca-certificates, su-exec
+RUN apk add --no-cache curl tzdata musl-locales ca-certificates su-exec
 
 WORKDIR /app
 
@@ -46,7 +46,11 @@ ENV JAVA_HOME="/opt/jre"
 ENV PATH="/opt/jre/bin:$PATH"
 
 # Prepare writable report storage directory with least privilege
-RUN mkdir -p /app/reports && chown -R appuser:appgroup /app
+RUN mkdir -p /app/reports && chown -R appuser:appgroup /app && chmod -R 777 /app/reports
+
+# Copy startup entrypoint script
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 
 # Copy extracted Spring Boot layers in order of change frequency
 # Layers that rarely change (dependencies) are cached indefinitely by Docker
@@ -54,8 +58,6 @@ COPY --from=builder --chown=appuser:appgroup /build/extracted/dependencies/ ./
 COPY --from=builder --chown=appuser:appgroup /build/extracted/spring-boot-loader/ ./
 COPY --from=builder --chown=appuser:appgroup /build/extracted/snapshot-dependencies/ ./
 COPY --from=builder --chown=appuser:appgroup /build/extracted/application/ ./
-
-USER appuser
 
 EXPOSE 8080
 
@@ -77,4 +79,4 @@ ENV SPRING_PROFILES_ACTIVE="default"
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
     CMD curl -fsS http://127.0.0.1:8080/actuator/health || exit 1
 
-ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
