@@ -24,6 +24,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -74,6 +75,36 @@ public class WorkflowExecutionController {
         return executionService.getExecutionById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/executions/{id}")
+    @Operation(summary = "Delete execution run", description = "Permanently deletes execution database record and purges report files from disk")
+    public ResponseEntity<Void> deleteExecution(@PathVariable("id") UUID id) {
+        executionService.deleteExecution(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/workflows/{workflowId}/executions")
+    @Operation(summary = "Clear workflow execution history", description = "Permanently deletes all execution database records and report files for a workflow")
+    public ResponseEntity<Void> clearWorkflowExecutions(@PathVariable("workflowId") UUID workflowId) {
+        executionService.deleteExecutionsForWorkflow(workflowId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/executions")
+    @Operation(summary = "Delete executions by query", description = "Deletes executions filtered by workflowId")
+    public ResponseEntity<Void> deleteExecutionsByFilter(@RequestParam("workflowId") UUID workflowId) {
+        executionService.deleteExecutionsForWorkflow(workflowId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/executions/purge")
+    @Operation(summary = "Purge execution history", description = "Bulk prunes old executions and frees disk storage across workflows")
+    public ResponseEntity<Map<String, Object>> purgeExecutions(
+            @RequestParam(value = "keepLatest", required = false, defaultValue = "30") Integer keepLatest,
+            @RequestParam(value = "olderThanDays", required = false) Integer olderThanDays) {
+        int purged = executionService.purgeExecutions(keepLatest, olderThanDays);
+        return ResponseEntity.ok(Map.of("message", "Execution history purged successfully", "purgedCount", purged));
     }
 
     @GetMapping(value = "/executions/{id}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

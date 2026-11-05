@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.FileSystemUtils;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -222,6 +223,30 @@ public class DynamicKarateRunner {
 
     public Path getReportDir(UUID executionId) {
         return Paths.get(reportsBasePath, executionId.toString()).toAbsolutePath().normalize();
+    }
+
+    public void deleteExecutionFiles(UUID executionId) {
+        if (executionId == null) {
+            return;
+        }
+        Path reportDir = getReportDir(executionId);
+        Path featuresDir = reportDir.resolveSibling("karate-features").resolve(executionId.toString());
+        try {
+            if (Files.exists(reportDir)) {
+                FileSystemUtils.deleteRecursively(reportDir);
+                log.info("Deleted report directory for execution {}", executionId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to delete report dir for execution {}: {}", executionId, e.getMessage());
+        }
+        try {
+            if (Files.exists(featuresDir)) {
+                FileSystemUtils.deleteRecursively(featuresDir);
+                log.info("Deleted features directory for execution {}", executionId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to delete features dir for execution {}: {}", executionId, e.getMessage());
+        }
     }
 
     private String buildDynamicFeatureContent(TestWorkflowEntity workflow, String environment) {

@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.orchestrator.platform.domain.entity.TestWorkflowEntity;
+import com.orchestrator.platform.domain.entity.WorkflowExecutionEntity;
 import com.orchestrator.platform.domain.enums.StepType;
 import com.orchestrator.platform.domain.model.ast.DbPollStepConfig;
 import com.orchestrator.platform.domain.model.ast.HttpRequestStepConfig;
@@ -33,6 +34,7 @@ import com.orchestrator.platform.domain.model.canvas.CanvasState;
 import com.orchestrator.platform.domain.model.dto.WorkflowCreateRequest;
 import com.orchestrator.platform.repository.TestWorkflowRepository;
 import com.orchestrator.platform.repository.WorkflowExecutionRepository;
+import com.orchestrator.platform.service.execution.DynamicKarateRunner;
 
 import jakarta.annotation.PostConstruct;
 
@@ -43,11 +45,14 @@ public class TestWorkflowService {
 
     private final TestWorkflowRepository workflowRepository;
     private final WorkflowExecutionRepository executionRepository;
+    private final DynamicKarateRunner karateRunner;
 
     public TestWorkflowService(TestWorkflowRepository workflowRepository,
-                               WorkflowExecutionRepository executionRepository) {
+                               WorkflowExecutionRepository executionRepository,
+                               DynamicKarateRunner karateRunner) {
         this.workflowRepository = workflowRepository;
         this.executionRepository = executionRepository;
+        this.karateRunner = karateRunner;
     }
 
     @Transactional(readOnly = true)
@@ -131,9 +136,13 @@ public class TestWorkflowService {
 
     @Transactional
     public void deleteWorkflow(UUID id) {
+        List<WorkflowExecutionEntity> executions = executionRepository.findByWorkflowIdOrderByCreatedAtDesc(id);
+        for (WorkflowExecutionEntity ex : executions) {
+            karateRunner.deleteExecutionFiles(ex.getId());
+        }
         executionRepository.deleteByWorkflowId(id);
         workflowRepository.deleteById(id);
-        log.info("Deleted workflow {} and its associated executions", id);
+        log.info("Deleted workflow {} and its associated executions ({} runs purged from DB and disk)", id, executions.size());
     }
 
     /**

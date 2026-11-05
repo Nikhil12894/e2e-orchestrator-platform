@@ -10,9 +10,12 @@ import com.orchestrator.platform.service.execution.DynamicKarateRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 
@@ -25,6 +28,12 @@ public class TestWorkflowExecutionService {
     private final TestWorkflowRepository workflowRepository;
     private final DynamicKarateRunner karateRunner;
     private final ExecutorService virtualThreadExecutor;
+
+    @Value("${orchestrator.retention.auto-prune-enabled:true}")
+    private boolean autoPruneEnabled;
+
+    @Value("${orchestrator.retention.max-runs-per-workflow:30}")
+    private int maxRunsPerWorkflow;
 
     public TestWorkflowExecutionService(WorkflowExecutionRepository executionRepository,
                                         TestWorkflowRepository workflowRepository,
@@ -65,6 +74,8 @@ public class TestWorkflowExecutionService {
                     ex.setErrorMessage(e.getMessage());
                     executionRepository.saveAndFlush(ex);
                 });
+            } finally {
+                pruneWorkflowExecutionsIfExceeded(workflowId);
             }
         });
 
@@ -81,5 +92,77 @@ public class TestWorkflowExecutionService {
 
     public Optional<WorkflowExecutionEntity> getExecutionById(UUID id) {
         return executionRepository.findById(id);
+    }
+
+    @Transactional
+    public void deleteExecution(UUID executionId) {
+        log.info("Deleting execution run [id={}]", executionId);
+        karateRunner.deleteExecutionFiles(executionId);
+        executionRepository.deleteById(executionId);
+    }
+
+    @Transactional
+    public void deleteExecutionsForWorkflow(UUID workflowId) {
+        log.info("Deleting all execution runs for workflow [id={}]", workflowId);
+        List<WorkflowExecutionEntity> executions = executionRepository.findByWorkflowIdOrderByCreatedAtDesc(workflowId);
+        for (WorkflowExecutionEntity ex : executions) {
+            karateRunner.deleteExecutionFiles(ex.getId());
+        }
+        executionRepository.deleteByWorkflowId(workflowId);
+    }
+
+    @Transactional
+    public int purgeExecutions(Integer keepLatest, Integer olderThanDays) {
+        log.info("Purging executions [keepLatest={}, olderThanDays={}]", keepLatest, olderThanDays);
+        List<WorkflowExecutionEntity> all = executionRepository.findAllByOrderByCreatedAtDesc();
+        int purged = 0;
+        Instant cutoff = (olderThanDays != null && olderThanDays > 0)
+                ? Instant.now().minus(Duration.ofDays(olderThanDays))
+                : null;
+        int limit = (keepLatest != null && keepLatest >= 0) ? keepLatest : 30;
+
+        Map<UUID, List<WorkflowExecutionEntity>> byWorkflow = new HashMap<>();
+        for (WorkflowExecutionEntity ex : all) {
+            byWorkflow.computeIfAbsent(ex.getWorkflowId(), k -> new ArrayList<>()).add(ex);
+        }
+
+        for (Map.Entry<UUID, List<WorkflowExecutionEntity>> entry : byWorkflow.entrySet()) {
+            List<WorkflowExecutionEntity> runs = entry.getValue();
+            for (int i = 0; i < runs.size(); i++) {
+                WorkflowExecutionEntity ex = runs.get(i);
+                boolean shouldDelete = false;
+                if (i >= limit) {
+                    shouldDelete = true;
+                }
+                if (cutoff != null && ex.getCreatedAt() != null && ex.getCreatedAt().isBefore(cutoff)) {
+                    shouldDelete = true;
+                }
+                if (shouldDelete) {
+                    karateRunner.deleteExecutionFiles(ex.getId());
+                    executionRepository.deleteById(ex.getId());
+                    purged++;
+                }
+            }
+        }
+        return purged;
+    }
+
+    public void pruneWorkflowExecutionsIfExceeded(UUID workflowId) {
+        if (!autoPruneEnabled || maxRunsPerWorkflow <= 0 || workflowId == null) {
+            return;
+        }
+        try {
+            List<WorkflowExecutionEntity> runs = executionRepository.findByWorkflowIdOrderByCreatedAtDesc(workflowId);
+            if (runs.size() > maxRunsPerWorkflow) {
+                List<WorkflowExecutionEntity> toDelete = runs.subList(maxRunsPerWorkflow, runs.size());
+                log.info("Auto-pruning {} excess execution runs for workflow {}", toDelete.size(), workflowId);
+                for (WorkflowExecutionEntity ex : toDelete) {
+                    karateRunner.deleteExecutionFiles(ex.getId());
+                    executionRepository.deleteById(ex.getId());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to auto-prune executions for workflow {}: {}", workflowId, e.getMessage());
+        }
     }
 }

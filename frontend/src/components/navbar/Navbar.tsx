@@ -40,6 +40,8 @@ interface NavbarProps {
   latestExecution: WorkflowExecution | null;
   workflowExecutions?: WorkflowExecution[];
   onViewReport: (url: string) => void;
+  onDeleteExecution?: (id: string) => Promise<void> | void;
+  onClearWorkflowExecutions?: (workflowId: string) => Promise<void> | void;
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
   isConsoleOpen: boolean;
@@ -61,6 +63,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   latestExecution,
   workflowExecutions = [],
   onViewReport,
+  onDeleteExecution,
+  onClearWorkflowExecutions,
   isSidebarOpen,
   onToggleSidebar,
   isConsoleOpen,
@@ -363,8 +367,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             isOpen={isHistoryModalOpen}
             onClose={() => setIsHistoryModalOpen(false)}
             workflowName={selectedWorkflow?.name || 'Workflow'}
+            workflowId={selectedWorkflow?.id}
             executions={workflowExecutions}
             onViewReport={onViewReport}
+            onDeleteExecution={onDeleteExecution}
+            onClearWorkflowExecutions={onClearWorkflowExecutions}
           />
         </Suspense>
       )}

@@ -288,6 +288,34 @@ export function App() {
     }
   };
 
+  // Delete a single execution run (and its disk report)
+  const handleDeleteExecution = async (id: string) => {
+    try {
+      await executionApi.deleteExecution(id);
+      setWorkflowExecutions((prev) => {
+        const remaining = prev.filter((e) => e.id !== id);
+        if (activeExecution?.id === id) {
+          setActiveExecution(remaining.length > 0 ? remaining[0] : null);
+        }
+        return remaining;
+      });
+    } catch (err) {
+      console.error('Failed to delete execution', err);
+    }
+  };
+
+  // Clear all execution runs for current workflow (and all disk reports)
+  const handleClearWorkflowExecutions = async (workflowId: string) => {
+    try {
+      await executionApi.clearWorkflowExecutions(workflowId);
+      setWorkflowExecutions([]);
+      setActiveExecution(null);
+      setExecutionEvents([]);
+    } catch (err) {
+      console.error('Failed to clear workflow executions', err);
+    }
+  };
+
   // Create new workflow with custom name and template
   const handleCreateCustomWorkflow = async (
     name: string,
@@ -537,6 +565,8 @@ export function App() {
         latestExecution={activeExecution}
         workflowExecutions={workflowExecutions}
         onViewReport={(url) => setReportModalUrl(url)}
+        onDeleteExecution={handleDeleteExecution}
+        onClearWorkflowExecutions={handleClearWorkflowExecutions}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         isConsoleOpen={isConsoleOpen}

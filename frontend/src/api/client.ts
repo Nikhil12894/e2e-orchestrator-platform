@@ -101,6 +101,21 @@ export const executionApi = {
     return resp.data;
   },
 
+  deleteExecution: async (id: string): Promise<void> => {
+    await api.delete(`/executions/${id}`);
+  },
+
+  clearWorkflowExecutions: async (workflowId: string): Promise<void> => {
+    await api.delete(`/workflows/${workflowId}/executions`);
+  },
+
+  purgeExecutions: async (keepLatest = 30, olderThanDays?: number): Promise<{ message: string; purgedCount: number }> => {
+    const params: Record<string, any> = { keepLatest };
+    if (olderThanDays !== undefined) params.olderThanDays = olderThanDays;
+    const resp = await api.delete<{ message: string; purgedCount: number }>('/executions/purge', { params });
+    return resp.data;
+  },
+
   subscribeToExecutionEvents: (
     executionId: string,
     onEvent: (event: ExecutionEventDto) => void,

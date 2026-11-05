@@ -41,6 +41,9 @@ spring:
 orchestrator:
   reports:
     base-path: ${ORCHESTRATOR_REPORTS_PATH:./target/karate-reports}
+  retention:
+    auto-prune-enabled: ${ORCHESTRATOR_RETENTION_AUTO_PRUNE_ENABLED:true}
+    max-runs-per-workflow: ${ORCHESTRATOR_RETENTION_MAX_RUNS_PER_WORKFLOW:3}
   async:
     core-pool-size: 8
     max-pool-size: 64

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
   History,
@@ -7,9 +7,11 @@ import {
   Clock,
   FileText,
   AlertCircle,
+  AlertTriangle,
   Timer,
   ChevronRight,
-  Server
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { WorkflowExecution } from '../../types/workflow';
 
@@ -17,18 +19,53 @@ interface ExecutionHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   workflowName: string;
+  workflowId?: string;
   executions: WorkflowExecution[];
   onViewReport: (reportPath: string) => void;
+  onDeleteExecution?: (id: string) => Promise<void> | void;
+  onClearWorkflowExecutions?: (workflowId: string) => Promise<void> | void;
 }
 
 export const ExecutionHistoryModal: React.FC<ExecutionHistoryModalProps> = ({
   isOpen,
   onClose,
   workflowName,
+  workflowId,
   executions,
   onViewReport,
+  onDeleteExecution,
+  onClearWorkflowExecutions,
 }) => {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isClearing, setIsClearing] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+
   if (!isOpen) return null;
+
+  const handleDeleteOne = async (id: string) => {
+    if (!onDeleteExecution) return;
+    try {
+      setDeletingId(id);
+      await onDeleteExecution(id);
+    } catch (err) {
+      console.error('Failed to delete execution', err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (!onClearWorkflowExecutions || !workflowId) return;
+    try {
+      setIsClearing(true);
+      await onClearWorkflowExecutions(workflowId);
+      setShowClearConfirm(false);
+    } catch (err) {
+      console.error('Failed to clear execution history', err);
+    } finally {
+      setIsClearing(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in select-none">
@@ -45,6 +82,17 @@ export const ExecutionHistoryModal: React.FC<ExecutionHistoryModalProps> = ({
                 <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30">
                   {executions.length} {executions.length === 1 ? 'run' : 'runs'}
                 </span>
+                {executions.length > 0 && onClearWorkflowExecutions && workflowId && (
+                  <button
+                    onClick={() => setShowClearConfirm(true)}
+                    disabled={isClearing}
+                    className="ml-2 flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 border border-rose-500/20 transition-all hover:border-rose-500/40"
+                    title="Clear all execution runs and delete report storage on disk"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Clear History</span>
+                  </button>
+                )}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-lg">
                 Workflow: <span className="text-slate-800 dark:text-slate-200 font-medium">{workflowName}</span>
@@ -59,6 +107,51 @@ export const ExecutionHistoryModal: React.FC<ExecutionHistoryModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Clear Confirmation Banner */}
+        {showClearConfirm && (
+          <div className="mx-6 mt-4 p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/80 animate-fade-in flex flex-col gap-3">
+            <div className="flex items-start gap-3">
+              <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-rose-700 dark:text-rose-300">
+                  Clear all {executions.length} execution runs for "{workflowName}"?
+                </h4>
+                <p className="text-[11px] text-rose-600/90 dark:text-rose-400/90 mt-1">
+                  This will permanently delete all database execution records and remove all generated Karate HTML reports and feature directories from local disk storage. This cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-1 border-t border-rose-200 dark:border-rose-800/50">
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                disabled={isClearing}
+                className="px-3 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClearAll}
+                disabled={isClearing}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-sm transition-all"
+              >
+                {isClearing ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Purging files & DB...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Confirm & Purge Storage</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Content list */}
         <div className="flex-1 overflow-y-auto p-6 space-y-3">
@@ -153,14 +246,14 @@ export const ExecutionHistoryModal: React.FC<ExecutionHistoryModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="shrink-0">
+                  <div className="flex items-center gap-2 shrink-0">
                     {exec.reportPath ? (
                       <button
                         onClick={() => {
                           onViewReport(exec.reportPath!);
                           onClose();
                         }}
-                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600/10 dark:bg-emerald-600/20 hover:bg-emerald-600/20 dark:hover:bg-emerald-600/30 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition-all shadow-sm"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/10 dark:bg-emerald-600/20 hover:bg-emerald-600/20 dark:hover:bg-emerald-600/30 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition-all shadow-sm"
                       >
                         <FileText className="w-3.5 h-3.5" />
                         <span>View Report</span>
@@ -168,6 +261,21 @@ export const ExecutionHistoryModal: React.FC<ExecutionHistoryModalProps> = ({
                       </button>
                     ) : (
                       <span className="text-xs text-slate-400 dark:text-slate-600 italic">No report</span>
+                    )}
+
+                    {onDeleteExecution && (
+                      <button
+                        onClick={() => handleDeleteOne(exec.id)}
+                        disabled={deletingId === exec.id}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 border border-slate-200 dark:border-slate-800 hover:border-rose-500/30 transition-all"
+                        title="Delete run & reclaim disk storage"
+                      >
+                        {deletingId === exec.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
                     )}
                   </div>
                 </div>
@@ -178,7 +286,7 @@ export const ExecutionHistoryModal: React.FC<ExecutionHistoryModalProps> = ({
 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50 text-xs text-slate-500">
-          <span>Click "View Report" on any run to inspect the profiling report and Karate summary.</span>
+          <span>Click "View Report" to inspect reports or the trash button to reclaim disk space.</span>
           <button
             onClick={onClose}
             className="px-3.5 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-medium transition-colors"
