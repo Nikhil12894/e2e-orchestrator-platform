@@ -23,6 +23,7 @@ interface LiveExecutionConsoleProps {
   isOpen: boolean;
   onToggle: () => void;
   onViewReport: (url: string) => void;
+  onCancelExecution?: (id: string) => void;
 }
 
 export const LiveExecutionConsole: React.FC<LiveExecutionConsoleProps> = ({
@@ -31,6 +32,7 @@ export const LiveExecutionConsole: React.FC<LiveExecutionConsoleProps> = ({
   isOpen,
   onToggle,
   onViewReport,
+  onCancelExecution,
 }) => {
   const [activeTab, setActiveTab] = useState<'steps' | 'logs' | 'context'>('steps');
   const [selectedStepResult, setSelectedStepResult] = useState<ExecutionStepResult | null>(null);
@@ -56,6 +58,8 @@ export const LiveExecutionConsole: React.FC<LiveExecutionConsoleProps> = ({
         return 'bg-blue-500/20 text-blue-400 border border-blue-500/30 animate-pulse';
       case 'PENDING':
         return 'bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse';
+      case 'CANCELLED':
+        return 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700';
       default:
         return 'bg-slate-800 text-slate-400 border border-slate-700';
     }
@@ -110,6 +114,17 @@ export const LiveExecutionConsole: React.FC<LiveExecutionConsoleProps> = ({
 
         {/* Console Action Bar */}
         <div className="flex items-center gap-2">
+          {isRunning && onCancelExecution && execution && (
+            <button
+              onClick={() => onCancelExecution(execution.id)}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-rose-600/10 hover:bg-rose-600/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-xs font-semibold transition-all shadow-sm"
+              title="Abort running execution"
+            >
+              <XCircle className="w-3.5 h-3.5 text-rose-500" />
+              <span>Abort Run</span>
+            </button>
+          )}
+
           {execution?.reportPath && (
             <button
               onClick={() => onViewReport(execution.reportPath!)}

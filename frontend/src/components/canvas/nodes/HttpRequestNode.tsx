@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import { Globe, ArrowRight, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { Globe, ArrowRight, CheckCircle2, XCircle, Clock, AlertCircle, EyeOff, RotateCcw } from 'lucide-react';
 import { CanvasNodeData, HttpMethod } from '../../../types/workflow';
 
 const methodColors: Record<HttpMethod, { bg: string; text: string; border: string }> = {
@@ -16,10 +16,13 @@ export const HttpRequestNode = memo(({ data, selected }: NodeProps<any>) => {
   const method = (nodeData.method || 'GET') as HttpMethod;
   const style = methodColors[method] || methodColors.GET;
   const status = nodeData.status;
+  const isMuted = nodeData.enabled === false;
 
   return (
     <div
       className={`relative w-72 rounded-xl bg-white/95 dark:bg-slate-900/90 border p-3.5 shadow-lg backdrop-blur-md transition-all ${
+        isMuted ? 'opacity-60' : ''
+      } ${
         selected ? 'border-blue-500 ring-2 ring-blue-500/30' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
       }`}
     >
@@ -34,25 +37,28 @@ export const HttpRequestNode = memo(({ data, selected }: NodeProps<any>) => {
           <span className="font-semibold text-xs text-slate-800 dark:text-slate-200 truncate">{nodeData.name || 'HTTP Request'}</span>
         </div>
 
-        {/* Status Indicator */}
-        {status === 'RUNNING' && (
+        {/* Status or Muted indicator */}
+        {isMuted ? (
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-500 text-[10px]">
+            <EyeOff className="w-3 h-3" />
+            <span>Muted</span>
+          </div>
+        ) : status === 'RUNNING' ? (
           <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-600 dark:text-blue-400 text-[10px] font-medium animate-pulse">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping" />
             Running
           </div>
-        )}
-        {status === 'COMPLETED' && (
+        ) : status === 'COMPLETED' ? (
           <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px]">
             <CheckCircle2 className="w-3 h-3" />
             <span>Passed</span>
           </div>
-        )}
-        {status === 'FAILED' && (
+        ) : status === 'FAILED' ? (
           <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-600 dark:text-rose-400 text-[10px]">
             <XCircle className="w-3 h-3" />
             <span>Failed</span>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* URL Endpoint Preview */}
@@ -76,6 +82,12 @@ export const HttpRequestNode = memo(({ data, selected }: NodeProps<any>) => {
           {nodeData.assertions && nodeData.assertions.length > 0 && (
             <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
               {nodeData.assertions.length} asserts
+            </span>
+          )}
+          {nodeData.retryCount && nodeData.retryCount > 1 && (
+            <span className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[9px] font-mono">
+              <RotateCcw className="w-2.5 h-2.5" />
+              {nodeData.retryCount}x
             </span>
           )}
         </div>

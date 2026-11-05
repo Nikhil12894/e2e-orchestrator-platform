@@ -3,10 +3,12 @@ package com.orchestrator.platform.service;
 import com.orchestrator.platform.domain.entity.TestWorkflowEntity;
 import com.orchestrator.platform.domain.entity.WorkflowExecutionEntity;
 import com.orchestrator.platform.domain.enums.ExecutionStatus;
+import com.orchestrator.platform.domain.model.dto.ExecutionEventDto;
 import com.orchestrator.platform.domain.model.dto.WorkflowExecutionRequest;
 import com.orchestrator.platform.repository.TestWorkflowRepository;
 import com.orchestrator.platform.repository.WorkflowExecutionRepository;
 import com.orchestrator.platform.service.execution.DynamicKarateRunner;
+import com.orchestrator.platform.service.execution.ExecutionLogBroadcaster;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -17,7 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 @Service
 public class TestWorkflowExecutionService {
@@ -27,7 +31,9 @@ public class TestWorkflowExecutionService {
     private final WorkflowExecutionRepository executionRepository;
     private final TestWorkflowRepository workflowRepository;
     private final DynamicKarateRunner karateRunner;
+    private final ExecutionLogBroadcaster logBroadcaster;
     private final ExecutorService virtualThreadExecutor;
+    private final Map<UUID, Future<?>> runningTasks = new ConcurrentHashMap<>();
 
     @Value("${orchestrator.retention.auto-prune-enabled:true}")
     private boolean autoPruneEnabled;
@@ -38,10 +44,12 @@ public class TestWorkflowExecutionService {
     public TestWorkflowExecutionService(WorkflowExecutionRepository executionRepository,
                                         TestWorkflowRepository workflowRepository,
                                         DynamicKarateRunner karateRunner,
+                                        ExecutionLogBroadcaster logBroadcaster,
                                         @Qualifier("workflowVirtualThreadExecutor") ExecutorService virtualThreadExecutor) {
         this.executionRepository = executionRepository;
         this.workflowRepository = workflowRepository;
         this.karateRunner = karateRunner;
+        this.logBroadcaster = logBroadcaster;
         this.virtualThreadExecutor = virtualThreadExecutor;
     }
 
@@ -59,7 +67,7 @@ public class TestWorkflowExecutionService {
         UUID executionId = savedExecution.getId();
 
         // Offload execution to Java 21 Virtual Threads
-        virtualThreadExecutor.submit(() -> {
+        Future<?> taskFuture = virtualThreadExecutor.submit(() -> {
             try {
                 karateRunner.executeWorkflow(
                         savedExecution,
@@ -70,16 +78,52 @@ public class TestWorkflowExecutionService {
             } catch (Exception e) {
                 log.error("Unhandled error during async virtual thread workflow execution: {}", e.getMessage(), e);
                 executionRepository.findById(executionId).ifPresent(ex -> {
-                    ex.setStatus(ExecutionStatus.FAILED);
-                    ex.setErrorMessage(e.getMessage());
-                    executionRepository.saveAndFlush(ex);
+                    if (ex.getStatus() != ExecutionStatus.CANCELLED) {
+                        ex.setStatus(ExecutionStatus.FAILED);
+                        ex.setErrorMessage(e.getMessage());
+                        executionRepository.saveAndFlush(ex);
+                    }
                 });
             } finally {
+                runningTasks.remove(executionId);
                 pruneWorkflowExecutionsIfExceeded(workflowId);
             }
         });
+        runningTasks.put(executionId, taskFuture);
 
         return savedExecution;
+    }
+
+    @Transactional
+    public WorkflowExecutionEntity cancelExecution(UUID executionId) {
+        log.info("Cancelling execution [id={}]", executionId);
+        Future<?> task = runningTasks.remove(executionId);
+        if (task != null) {
+            task.cancel(true);
+        }
+
+        WorkflowExecutionEntity execution = executionRepository.findById(executionId)
+                .orElseThrow(() -> new IllegalArgumentException("Execution not found with ID: " + executionId));
+
+        if (execution.getStatus() == ExecutionStatus.RUNNING || execution.getStatus() == ExecutionStatus.PENDING) {
+            execution.setStatus(ExecutionStatus.CANCELLED);
+            execution.setErrorMessage("Execution cancelled by user");
+            Instant now = Instant.now();
+            execution.setEndTime(now);
+            if (execution.getStartTime() != null) {
+                execution.setDurationMs(Duration.between(execution.getStartTime(), now).toMillis());
+            }
+            execution = executionRepository.saveAndFlush(execution);
+
+            logBroadcaster.broadcast(new ExecutionEventDto(
+                    executionId, execution.getWorkflowId(), "WORKFLOW_CANCELLED", null, null,
+                    ExecutionStatus.CANCELLED,
+                    "Execution " + executionId + " was cancelled by user",
+                    execution
+            ));
+        }
+
+        return execution;
     }
 
     public List<WorkflowExecutionEntity> getAllExecutions() {

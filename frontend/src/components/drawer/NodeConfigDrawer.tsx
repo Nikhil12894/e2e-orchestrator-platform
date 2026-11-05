@@ -6,6 +6,9 @@ import {
   Database,
   Radio,
   Timer,
+  Code2,
+  RotateCcw,
+  EyeOff,
   Plus,
   Trash2,
   Variable,
@@ -225,6 +228,7 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
               {nodeType === 'dbPoll' && <Database className="w-4 h-4 text-amber-500 dark:text-amber-400" />}
               {nodeType === 'kafkaAssert' && <Radio className="w-4 h-4 text-purple-500 dark:text-purple-400" />}
               {nodeType === 'delay' && <Timer className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />}
+              {nodeType === 'transform' && <Code2 className="w-4 h-4 text-violet-500 dark:text-violet-400" />}
             </div>
             <div className="min-w-0">
               <h3 className="font-semibold text-xs text-slate-800 dark:text-slate-100 truncate">{data.name || 'Step Configuration'}</h3>
@@ -344,6 +348,43 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                       onChange={(e) => update({ expectedStatus: parseInt(e.target.value) || 200 })}
                       className="w-28 px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-blue-500"
                     />
+                  </div>
+
+                  {/* Retry Policy */}
+                  <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <RotateCcw className="w-3.5 h-3.5 text-amber-500" />
+                        <label className="text-[11px] font-semibold text-slate-300">Retry Policy</label>
+                      </div>
+                      <span className="text-[10px] font-mono text-amber-500 font-semibold">
+                        {(data.retryCount || 1) > 1 ? `${data.retryCount}x attempts` : '1 attempt (no retry)'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1">Max Attempts (1-5)</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="5"
+                          value={data.retryCount ?? 1}
+                          onChange={(e) => update({ retryCount: Math.max(1, Math.min(5, parseInt(e.target.value) || 1)) })}
+                          className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1">Interval (ms)</label>
+                        <input
+                          type="number"
+                          min="100"
+                          step="100"
+                          value={data.retryIntervalMs ?? 500}
+                          onChange={(e) => update({ retryIntervalMs: Math.max(100, parseInt(e.target.value) || 500) })}
+                          className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {/* Step HTTP Headers & Inheritance Control */}
@@ -795,9 +836,82 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                 </div>
               )}
 
+              {/* Transform Script Step */}
+              {nodeType === 'transform' && (
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-[11px] font-semibold text-slate-300">JavaScript Transform Function</label>
+                      <span className="text-[10px] text-violet-400 font-mono">function(ctx)</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mb-2 leading-tight">
+                      Receives workflow context as <code className="text-violet-400 font-mono">ctx</code>. The returned object will be merged into global workflow context for downstream steps.
+                    </p>
+
+                    {/* Quick Snippet Templates */}
+                    <div className="flex flex-wrap gap-1.5 mb-2.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          update({
+                            script: `function(ctx) {\n  return {\n    timestamp: new Date().toISOString(),\n    nonce: Math.random().toString(36).substring(2, 10)\n  };\n}`,
+                          })
+                        }
+                        className="px-2 py-1 rounded bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 border border-violet-500/20 text-[10px] font-medium transition-colors"
+                      >
+                        + Timestamp & Nonce
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          update({
+                            script: `function(ctx) {\n  var orderId = ctx.orderId || 'ORD-UNKNOWN';\n  return {\n    maskedOrder: orderId.substring(0, 4) + '****',\n    processedAt: Date.now()\n  };\n}`,
+                          })
+                        }
+                        className="px-2 py-1 rounded bg-violet-500/10 hover:bg-violet-500/20 text-violet-400 border border-violet-500/20 text-[10px] font-medium transition-colors"
+                      >
+                        + Mask & Reshape
+                      </button>
+                    </div>
+
+                    <textarea
+                      rows={8}
+                      value={data.script || 'function(ctx) {\n  return {\n    timestamp: new Date().toISOString()\n  };\n}'}
+                      onChange={(e) => update({ script: e.target.value })}
+                      className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-violet-500 leading-relaxed"
+                      placeholder="function(ctx) { return { myVar: 'value' }; }"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Step Execution & Reporting Settings */}
               <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3">
                 <span className="text-[11px] font-semibold text-slate-300 block">Execution & Reporting Options</span>
+
+                {/* Step Enabled / Muted */}
+                <label className="flex items-start gap-2.5 cursor-pointer pb-2 border-b border-slate-800/80">
+                  <input
+                    type="checkbox"
+                    checked={data.enabled !== false}
+                    onChange={(e) => update({ enabled: e.target.checked })}
+                    className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-900 text-blue-500 focus:ring-0 cursor-pointer"
+                  />
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-medium text-slate-200">Step Active</span>
+                      {data.enabled === false && (
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1">
+                          <EyeOff className="w-2.5 h-2.5" />
+                          Muted / Skipped
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-slate-500 block leading-tight">
+                      When disabled, this step is skipped entirely during workflow execution without deleting its configuration.
+                    </span>
+                  </div>
+                </label>
 
                 {/* Continue on Failure */}
                 <label className="flex items-start gap-2.5 cursor-pointer">

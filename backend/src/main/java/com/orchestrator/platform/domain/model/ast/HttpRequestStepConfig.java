@@ -16,6 +16,8 @@ public class HttpRequestStepConfig implements Serializable {
     private Object body;
     private Integer expectedStatus = 200;
     private Integer timeoutMs = 15000;
+    private Integer retryCount = 1;
+    private Integer retryIntervalMs = 500;
 
     public HttpRequestStepConfig() {}
 
@@ -45,4 +47,10 @@ public class HttpRequestStepConfig implements Serializable {
 
     public Integer getTimeoutMs() { return timeoutMs; }
     public void setTimeoutMs(Integer timeoutMs) { this.timeoutMs = timeoutMs; }
+
+    public Integer getRetryCount() { return retryCount; }
+    public void setRetryCount(Integer retryCount) { this.retryCount = retryCount; }
+
+    public Integer getRetryIntervalMs() { return retryIntervalMs; }
+    public void setRetryIntervalMs(Integer retryIntervalMs) { this.retryIntervalMs = retryIntervalMs; }
 }

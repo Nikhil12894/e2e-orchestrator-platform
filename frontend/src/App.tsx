@@ -316,6 +316,32 @@ export function App() {
     }
   };
 
+  // Import workflow from JSON
+  const handleImportWorkflow = async (workflowData: Partial<TestWorkflow>) => {
+    try {
+      const imported = await workflowApi.importWorkflow(workflowData);
+      setWorkflows((prev) => [imported, ...prev]);
+      selectWorkflow(imported);
+    } catch (err) {
+      console.error('Failed to import workflow', err);
+      alert('Failed to import workflow. Please ensure JSON format is valid.');
+    }
+  };
+
+  // Cancel running execution
+  const handleCancelExecution = async (executionId: string) => {
+    try {
+      const cancelled = await executionApi.cancelExecution(executionId);
+      setActiveExecution(cancelled);
+      setWorkflowExecutions((prev) =>
+        prev.map((e) => (e.id === executionId ? cancelled : e))
+      );
+      setIsRunning(false);
+    } catch (err) {
+      console.error('Failed to cancel execution', err);
+    }
+  };
+
   // Create new workflow with custom name and template
   const handleCreateCustomWorkflow = async (
     name: string,
@@ -565,6 +591,7 @@ export function App() {
         latestExecution={activeExecution}
         workflowExecutions={workflowExecutions}
         onViewReport={(url) => setReportModalUrl(url)}
+        onImportWorkflow={handleImportWorkflow}
         onDeleteExecution={handleDeleteExecution}
         onClearWorkflowExecutions={handleClearWorkflowExecutions}
         isSidebarOpen={isSidebarOpen}
@@ -589,6 +616,7 @@ export function App() {
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
+            onSetNodes={setNodes}
             onConnect={onConnect}
             onReconnect={onReconnect}
             onNodeClick={handleNodeClick}
@@ -619,6 +647,7 @@ export function App() {
         isOpen={isConsoleOpen}
         onToggle={() => setIsConsoleOpen(!isConsoleOpen)}
         onViewReport={(url) => setReportModalUrl(url)}
+        onCancelExecution={handleCancelExecution}
       />
 
       {/* Lazy Modals loaded on-demand */}

@@ -1,6 +1,6 @@
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
-export type StepType = 'HTTP_REQUEST' | 'DB_POLL' | 'KAFKA_ASSERT' | 'DELAY' | 'CONDITION';
+export type StepType = 'HTTP_REQUEST' | 'DB_POLL' | 'KAFKA_ASSERT' | 'DELAY' | 'CONDITION' | 'TRANSFORM';
 
 export type ExecutionStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 
@@ -50,6 +50,12 @@ export interface HttpRequestStepConfig {
   body?: any;
   expectedStatus?: number;
   timeoutMs?: number;
+  retryCount?: number;
+  retryIntervalMs?: number;
+}
+
+export interface TransformStepConfig {
+  script: string;
 }
 
 export interface DbPollStepConfig {
@@ -82,6 +88,7 @@ export interface WorkflowStep {
   httpConfig?: HttpRequestStepConfig;
   dbPollConfig?: DbPollStepConfig;
   kafkaConfig?: KafkaAssertStepConfig;
+  transformConfig?: TransformStepConfig;
   delayMs?: number;
   assertions?: StepAssertion[];
   extractions?: VariableExtraction[];
@@ -126,6 +133,10 @@ export interface CanvasNodeData {
   jsonPath?: string;
   expectedValue?: string;
   delayMs?: number;
+  script?: string;
+  retryCount?: number;
+  retryIntervalMs?: number;
+  enabled?: boolean;
   assertions?: StepAssertion[];
   extractions?: VariableExtraction[];
   continueOnFailure?: boolean;

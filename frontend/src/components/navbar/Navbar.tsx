@@ -16,13 +16,20 @@ import {
   Sun,
   Moon,
   Laptop,
-  Check
+  Check,
+  Download,
+  Upload,
+  FileCode
 } from 'lucide-react';
 import { TestWorkflow, WorkflowExecution } from '../../types/workflow';
 import { useTheme, Theme } from '../../context/ThemeContext';
 
 const ExecutionHistoryModal = React.lazy(() =>
   import('./ExecutionHistoryModal').then((m) => ({ default: m.ExecutionHistoryModal }))
+);
+
+const CiCdWebhookModal = React.lazy(() =>
+  import('./CiCdWebhookModal').then((m) => ({ default: m.CiCdWebhookModal }))
 );
 
 interface NavbarProps {
@@ -32,6 +39,7 @@ interface NavbarProps {
   onCreateNewWorkflow: () => void;
   onOpenSettings: () => void;
   onSaveWorkflow: () => void;
+  onImportWorkflow?: (workflow: Partial<TestWorkflow>) => void;
   onDeleteWorkflow: (workflowId: string) => void;
   onRunWorkflow: () => void;
   isRunning: boolean;
@@ -55,6 +63,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onCreateNewWorkflow,
   onOpenSettings,
   onSaveWorkflow,
+  onImportWorkflow,
   onDeleteWorkflow,
   onRunWorkflow,
   isRunning,
@@ -74,6 +83,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
   const themeMenuRef = useRef<HTMLDivElement>(null);
 
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isCiCdModalOpen, setIsCiCdModalOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
@@ -82,12 +96,33 @@ export const Navbar: React.FC<NavbarProps> = ({
       if (themeMenuRef.current && !themeMenuRef.current.contains(e.target as Node)) {
         setIsThemeMenuOpen(false);
       }
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setIsExportMenuOpen(false);
+      }
     };
-    if (isThemeMenuOpen) {
+    if (isThemeMenuOpen || isExportMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [isThemeMenuOpen]);
+  }, [isThemeMenuOpen, isExportMenuOpen]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const json = JSON.parse(evt.target?.result as string);
+        if (onImportWorkflow) {
+          onImportWorkflow(json);
+        }
+      } catch (err) {
+        alert('Invalid workflow JSON file');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   const confirmDelete = () => {
     if (selectedWorkflow) {
@@ -175,6 +210,88 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Save className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
             <span className="hidden md:inline">Save</span>
           </button>
+
+          {/* Export Menu */}
+          <div className="relative" ref={exportMenuRef}>
+            <button
+              onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+              disabled={!selectedWorkflow}
+              title="Export as Karate .feature, Workflow JSON, or CI/CD cURL snippet"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-medium transition-colors disabled:opacity-40"
+            >
+              <Download className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
+              <span className="hidden lg:inline">Export</span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
+
+            {isExportMenuOpen && selectedWorkflow && (
+              <div className="absolute left-0 mt-2 w-52 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl py-1 z-50 text-xs text-slate-700 dark:text-slate-200 animate-in fade-in duration-100">
+                <div className="px-3 py-1.5 text-[10px] font-semibold tracking-wider text-slate-400 uppercase border-b border-slate-100 dark:border-slate-800">
+                  Export Workflow
+                </div>
+                <button
+                  onClick={() => {
+                    setIsExportMenuOpen(false);
+                    window.open(`/api/v1/workflows/${selectedWorkflow.id}/export/feature`, '_blank');
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <FileCode className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <div>
+                    <span className="font-medium block">Karate .feature</span>
+                    <span className="text-[10px] text-slate-400 block">Standalone file for CI/CD</span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => {
+                    setIsExportMenuOpen(false);
+                    window.open(`/api/v1/workflows/${selectedWorkflow.id}/export/json`, '_blank');
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <div>
+                    <span className="font-medium block">Workflow JSON</span>
+                    <span className="text-[10px] text-slate-400 block">Canvas & AST backup</span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => {
+                    setIsExportMenuOpen(false);
+                    setIsCiCdModalOpen(true);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-800 border-t border-slate-100 dark:border-slate-800 transition-colors"
+                >
+                  <Terminal className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                  <div>
+                    <span className="font-medium block">cURL Webhook</span>
+                    <span className="text-[10px] text-slate-400 block">Copy CI/CD bash trigger</span>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Import Button */}
+          {onImportWorkflow && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                title="Import workflow from JSON file"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-xs font-medium transition-colors"
+              >
+                <Upload className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400" />
+                <span className="hidden lg:inline">Import</span>
+              </button>
+            </>
+          )}
 
           {/* Delete Workflow Action */}
           <button
@@ -372,6 +489,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             onViewReport={onViewReport}
             onDeleteExecution={onDeleteExecution}
             onClearWorkflowExecutions={onClearWorkflowExecutions}
+          />
+        </Suspense>
+      )}
+
+      {/* CI/CD cURL Webhook Modal */}
+      {isCiCdModalOpen && selectedWorkflow && (
+        <Suspense fallback={null}>
+          <CiCdWebhookModal
+            isOpen={isCiCdModalOpen}
+            onClose={() => setIsCiCdModalOpen(false)}
+            workflow={selectedWorkflow}
+            currentEnvironment={environment}
           />
         </Suspense>
       )}

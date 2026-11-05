@@ -23,4 +23,7 @@ Feature: Dynamic Step Executor
     # Branch 4: Delay Step
     * if (stepType == 'DELAY') karate.set('stepRes', karate.call('classpath:karate/execute-delay.feature', { resolvedStep: resolvedStep, executionId: executionId }))
 
+    # Branch 5: JavaScript Data Transform
+    * if (stepType == 'TRANSFORM') karate.set('stepRes', karate.call('classpath:karate/execute-transform.feature', { resolvedStep: resolvedStep, executionId: executionId, globalContext: globalContext }))
+
     * def extractedVars = (karate.get('stepRes') && stepRes.extractedVars) ? stepRes.extractedVars : {}

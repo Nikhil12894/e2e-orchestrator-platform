@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.orchestrator.platform.domain.entity.TestWorkflowEntity;
 import com.orchestrator.platform.domain.entity.WorkflowExecutionEntity;
 import com.orchestrator.platform.domain.enums.StepType;
@@ -24,6 +25,7 @@ import com.orchestrator.platform.domain.model.ast.DbPollStepConfig;
 import com.orchestrator.platform.domain.model.ast.HttpRequestStepConfig;
 import com.orchestrator.platform.domain.model.ast.KafkaAssertStepConfig;
 import com.orchestrator.platform.domain.model.ast.StepAssertion;
+import com.orchestrator.platform.domain.model.ast.TransformStepConfig;
 import com.orchestrator.platform.domain.model.ast.VariableExtraction;
 import com.orchestrator.platform.domain.model.ast.WorkflowAst;
 import com.orchestrator.platform.domain.model.ast.WorkflowStep;
@@ -46,13 +48,16 @@ public class TestWorkflowService {
     private final TestWorkflowRepository workflowRepository;
     private final WorkflowExecutionRepository executionRepository;
     private final DynamicKarateRunner karateRunner;
+    private final ObjectMapper objectMapper;
 
     public TestWorkflowService(TestWorkflowRepository workflowRepository,
                                WorkflowExecutionRepository executionRepository,
-                               DynamicKarateRunner karateRunner) {
+                               DynamicKarateRunner karateRunner,
+                               ObjectMapper objectMapper) {
         this.workflowRepository = workflowRepository;
         this.executionRepository = executionRepository;
         this.karateRunner = karateRunner;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional(readOnly = true)
@@ -145,6 +150,91 @@ public class TestWorkflowService {
         log.info("Deleted workflow {} and its associated executions ({} runs purged from DB and disk)", id, executions.size());
     }
 
+    public String generateStandaloneKarateFeature(UUID id) {
+        TestWorkflowEntity workflow = workflowRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Workflow not found with ID: " + id));
+
+        StringBuilder sb = new StringBuilder();
+        String safeName = workflow.getName() != null ? workflow.getName().replace("\n", " ").trim() : "Workflow";
+        sb.append("@e2e-workflow\n");
+        sb.append("Feature: ").append(safeName).append(" (v").append(workflow.getVersion()).append(")\n\n");
+
+        sb.append("  Background:\n");
+        sb.append("    * configure ssl = true\n");
+
+        WorkflowAst ast = workflow.getWorkflowAst();
+        if (ast != null && ast.getDefaultHeaders() != null && !ast.getDefaultHeaders().isEmpty()) {
+            for (Map.Entry<String, String> h : ast.getDefaultHeaders().entrySet()) {
+                sb.append("    * configure headers = karate.merge(karate.get('headers', {}), { '")
+                        .append(h.getKey()).append("': '").append(h.getValue()).append("' })\n");
+            }
+        }
+        sb.append("\n");
+
+        List<WorkflowStep> steps = ast != null && ast.getSteps() != null ? ast.getSteps() : Collections.emptyList();
+        int stepIdx = 1;
+        for (WorkflowStep step : steps) {
+            if (!step.isEnabled()) {
+                sb.append("  # [MUTED / DISABLED] Scenario: ").append(step.getName()).append("\n\n");
+                continue;
+            }
+            sb.append("  Scenario: Step ").append(stepIdx++).append(" - ").append(step.getName()).append("\n");
+
+            if (step.getType() == StepType.HTTP_REQUEST && step.getHttpConfig() != null) {
+                HttpRequestStepConfig cfg = step.getHttpConfig();
+                if (cfg.getRetryCount() > 1) {
+                    sb.append("    * configure retry = { count: ").append(cfg.getRetryCount())
+                            .append(", interval: ").append(cfg.getRetryIntervalMs()).append(" }\n");
+                    sb.append("    * retry until responseStatus == ")
+                            .append(cfg.getExpectedStatus() != null ? cfg.getExpectedStatus() : 200).append("\n");
+                }
+                sb.append("    Given url '").append(cfg.getUrl() != null ? cfg.getUrl() : "").append("'\n");
+                if (cfg.getHeaders() != null && !cfg.getHeaders().isEmpty()) {
+                    for (Map.Entry<String, String> h : cfg.getHeaders().entrySet()) {
+                        sb.append("    And header ").append(h.getKey()).append(" = '").append(h.getValue()).append("'\n");
+                    }
+                }
+                if (cfg.getBody() != null) {
+                    try {
+                        String bodyJson = objectMapper.writeValueAsString(cfg.getBody());
+                        sb.append("    And request ").append(bodyJson).append("\n");
+                    } catch (Exception e) {
+                        sb.append("    And request '").append(cfg.getBody()).append("'\n");
+                    }
+                }
+                sb.append("    When method ").append(cfg.getMethod() != null ? cfg.getMethod().toLowerCase() : "get").append("\n");
+                sb.append("    Then status ").append(cfg.getExpectedStatus() != null ? cfg.getExpectedStatus() : 200).append("\n");
+
+                if (step.getExtractions() != null) {
+                    for (VariableExtraction ext : step.getExtractions()) {
+                        if ("RESPONSE_BODY".equalsIgnoreCase(ext.getSource())) {
+                            sb.append("    * def ").append(ext.getVariableName()).append(" = karate.jsonPath(response, '").append(ext.getJsonPath()).append("')\n");
+                        }
+                    }
+                }
+            } else if (step.getType() == StepType.DELAY) {
+                sb.append("    * karate.pause(").append(step.getDelayMs() != null ? step.getDelayMs() : 1000).append(")\n");
+            } else if (step.getType() == StepType.TRANSFORM && step.getTransformConfig() != null) {
+                sb.append("    * def transformFn = ").append(step.getTransformConfig().getScript()).append("\n");
+                sb.append("    * def transformResult = transformFn(karate.get('context', {}))\n");
+            } else if (step.getType() == StepType.DB_POLL) {
+                sb.append("    # DB Polling Step: ").append(step.getName()).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        return sb.toString();
+    }
+
+    @Transactional
+    public TestWorkflowEntity importWorkflow(WorkflowCreateRequest request) {
+        String originalName = request.getName() != null ? request.getName() : "Imported Workflow";
+        if (!originalName.contains("(Imported)")) {
+            request.setName(originalName + " (Imported)");
+        }
+        return createWorkflow(request);
+    }
+
     /**
      * Converts visual React Flow nodes and edges into an executable WorkflowAst in topological sequence.
      */
@@ -232,6 +322,9 @@ public class TestWorkflowService {
         step.setName((String) data.getOrDefault("name", node.getId()));
         step.setContinueOnFailure(Boolean.TRUE.equals(data.get("continueOnFailure")) || "true".equalsIgnoreCase(String.valueOf(data.get("continueOnFailure"))));
         step.setExcludeFromReport(Boolean.TRUE.equals(data.get("excludeFromReport")) || "true".equalsIgnoreCase(String.valueOf(data.get("excludeFromReport"))));
+        if (data.get("enabled") != null) {
+            step.setEnabled(Boolean.TRUE.equals(data.get("enabled")) || !"false".equalsIgnoreCase(String.valueOf(data.get("enabled"))));
+        }
 
         String nodeType = node.getType() != null ? node.getType().toLowerCase() : "httprequest";
 
@@ -260,6 +353,16 @@ public class TestWorkflowService {
             }
             if (data.get("expectedStatus") != null) {
                 httpConfig.setExpectedStatus(Integer.parseInt(String.valueOf(data.get("expectedStatus"))));
+            }
+            if (data.get("retryCount") != null) {
+                try {
+                    httpConfig.setRetryCount(Integer.parseInt(String.valueOf(data.get("retryCount"))));
+                } catch (Exception ignored) {}
+            }
+            if (data.get("retryIntervalMs") != null) {
+                try {
+                    httpConfig.setRetryIntervalMs(Integer.parseInt(String.valueOf(data.get("retryIntervalMs"))));
+                } catch (Exception ignored) {}
             }
             step.setHttpConfig(httpConfig);
 
@@ -292,6 +395,13 @@ public class TestWorkflowService {
             step.setType(StepType.DELAY);
             long delay = data.get("delayMs") != null ? Long.parseLong(String.valueOf(data.get("delayMs"))) : 2000L;
             step.setDelayMs(delay);
+
+        } else if (nodeType.contains("transform") || nodeType.contains("script")) {
+            step.setType(StepType.TRANSFORM);
+            TransformStepConfig transConfig = new TransformStepConfig();
+            String script = (String) data.getOrDefault("script", "function(ctx) { return { timestamp: new Date().toISOString() }; }");
+            transConfig.setScript(script);
+            step.setTransformConfig(transConfig);
         }
 
         // Extractions

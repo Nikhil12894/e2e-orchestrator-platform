@@ -74,6 +74,19 @@ export const workflowApi = {
   deleteWorkflow: async (id: string): Promise<void> => {
     await api.delete(`/workflows/${id}`);
   },
+
+  importWorkflow: async (workflow: Partial<TestWorkflow>): Promise<TestWorkflow> => {
+    const resp = await api.post<TestWorkflow>('/workflows/import', workflow);
+    return resp.data;
+  },
+
+  exportFeatureUrl: (id: string): string => {
+    return `/api/v1/workflows/${id}/export/feature`;
+  },
+
+  exportJsonUrl: (id: string): string => {
+    return `/api/v1/workflows/${id}/export/json`;
+  },
 };
 
 export const executionApi = {
@@ -98,6 +111,11 @@ export const executionApi = {
 
   getExecutionById: async (id: string): Promise<WorkflowExecution> => {
     const resp = await api.get<WorkflowExecution>(`/executions/${id}`);
+    return resp.data;
+  },
+
+  cancelExecution: async (id: string): Promise<WorkflowExecution> => {
+    const resp = await api.post<WorkflowExecution>(`/executions/${id}/cancel`);
     return resp.data;
   },
 

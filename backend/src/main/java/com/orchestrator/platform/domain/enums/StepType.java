@@ -5,5 +5,6 @@ public enum StepType {
     DB_POLL,
     KAFKA_ASSERT,
     DELAY,
-    CONDITION
+    CONDITION,
+    TRANSFORM
 }

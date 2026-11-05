@@ -77,6 +77,13 @@ public class WorkflowExecutionController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @PostMapping("/executions/{id}/cancel")
+    @Operation(summary = "Cancel execution", description = "Aborts a running virtual thread execution and updates its status to CANCELLED")
+    public ResponseEntity<WorkflowExecutionEntity> cancelExecution(@PathVariable("id") UUID id) {
+        WorkflowExecutionEntity cancelled = executionService.cancelExecution(id);
+        return ResponseEntity.ok(cancelled);
+    }
+
     @DeleteMapping("/executions/{id}")
     @Operation(summary = "Delete execution run", description = "Permanently deletes execution database record and purges report files from disk")
     public ResponseEntity<Void> deleteExecution(@PathVariable("id") UUID id) {

@@ -20,15 +20,19 @@ import { HttpRequestNode } from './nodes/HttpRequestNode';
 import { DbPollNode } from './nodes/DbPollNode';
 import { KafkaAssertNode } from './nodes/KafkaAssertNode';
 import { DelayNode } from './nodes/DelayNode';
+import { TransformNode } from './nodes/TransformNode';
 import { RemovableEdge } from './edges/RemovableEdge';
 import { CanvasNode, CanvasEdge } from '../../types/workflow';
 import { useTheme } from '../../context/ThemeContext';
+import { getAutoLayoutedNodes } from '../../utils/layoutEngine';
+import { Sparkles } from 'lucide-react';
 
 const nodeTypes: any = {
   httpRequest: HttpRequestNode,
   dbPoll: DbPollNode,
   kafkaAssert: KafkaAssertNode,
   delay: DelayNode,
+  transform: TransformNode,
 };
 
 const edgeTypes: any = {
@@ -41,6 +45,7 @@ interface FlowCanvasInnerProps {
   edges: Edge[];
   onNodesChange: OnNodesChange<Node>;
   onEdgesChange: OnEdgesChange<Edge>;
+  onSetNodes?: (nodes: Node[]) => void;
   onConnect: (connection: Connection) => void;
   onReconnect?: (oldEdge: Edge, newConnection: Connection) => void;
   onNodeClick: (event: React.MouseEvent, node: Node) => void;
@@ -52,14 +57,24 @@ const FlowCanvasInner: React.FC<FlowCanvasInnerProps> = ({
   edges,
   onNodesChange,
   onEdgesChange,
+  onSetNodes,
   onConnect,
   onReconnect,
   onNodeClick,
   onDropNewNode,
 }) => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
   const { resolvedTheme } = useTheme();
+
+  const handleAutoLayout = useCallback(() => {
+    if (!onSetNodes || nodes.length === 0) return;
+    const layouted = getAutoLayoutedNodes(nodes, edges, { direction: 'LR' });
+    onSetNodes(layouted);
+    setTimeout(() => {
+      fitView({ duration: 400 });
+    }, 50);
+  }, [nodes, edges, onSetNodes, fitView]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -111,12 +126,28 @@ const FlowCanvasInner: React.FC<FlowCanvasInnerProps> = ({
       >
         <Background variant={BackgroundVariant.Dots} gap={16} size={1} color={resolvedTheme === 'dark' ? '#1e293b' : '#cbd5e1'} />
         <Controls className="!bg-white dark:!bg-slate-900 !border-slate-200 dark:!border-slate-800 !shadow-lg [&>button]:!border-slate-200 dark:[&>button]:!border-slate-800 [&>button]:!text-slate-600 dark:[&>button]:!text-slate-300 [&>button:hover]:!bg-slate-100 dark:[&>button:hover]:!bg-slate-800" />
+        
+        {/* Floating Auto-Layout Toolbar */}
+        {onSetNodes && nodes.length > 0 && (
+          <div className="absolute top-4 right-4 z-10 flex items-center gap-2 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-xl p-1 shadow-lg">
+            <button
+              onClick={handleAutoLayout}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 transition-colors"
+              title="Automatically align and arrange canvas nodes hierarchically"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Auto Align</span>
+            </button>
+          </div>
+        )}
+
         <MiniMap
           nodeColor={(n) => {
             if (n.type === 'httpRequest') return '#3b82f6';
             if (n.type === 'dbPoll') return '#f59e0b';
             if (n.type === 'kafkaAssert') return '#a855f7';
             if (n.type === 'delay') return '#06b6d4';
+            if (n.type === 'transform') return '#8b5cf6';
             return '#64748b';
           }}
           maskColor={resolvedTheme === 'dark' ? 'rgba(11, 15, 25, 0.8)' : 'rgba(241, 245, 249, 0.85)'}
@@ -132,6 +163,7 @@ interface FlowCanvasProps {
   edges: Edge[];
   onNodesChange: OnNodesChange<Node>;
   onEdgesChange: OnEdgesChange<Edge>;
+  onSetNodes?: (nodes: Node[]) => void;
   onConnect: (connection: Connection) => void;
   onReconnect?: (oldEdge: Edge, newConnection: Connection) => void;
   onNodeClick: (event: React.MouseEvent, node: Node) => void;

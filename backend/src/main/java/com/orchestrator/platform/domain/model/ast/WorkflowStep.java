@@ -13,6 +13,7 @@ public class WorkflowStep implements Serializable {
     private HttpRequestStepConfig httpConfig;
     private DbPollStepConfig dbPollConfig;
     private KafkaAssertStepConfig kafkaConfig;
+    private TransformStepConfig transformConfig;
     private Long delayMs;
     private List<StepAssertion> assertions = new ArrayList<>();
     private List<VariableExtraction> extractions = new ArrayList<>();
@@ -41,6 +42,9 @@ public class WorkflowStep implements Serializable {
 
     public KafkaAssertStepConfig getKafkaConfig() { return kafkaConfig; }
     public void setKafkaConfig(KafkaAssertStepConfig kafkaConfig) { this.kafkaConfig = kafkaConfig; }
+
+    public TransformStepConfig getTransformConfig() { return transformConfig; }
+    public void setTransformConfig(TransformStepConfig transformConfig) { this.transformConfig = transformConfig; }
 
     public Long getDelayMs() { return delayMs; }
     public void setDelayMs(Long delayMs) { this.delayMs = delayMs; }

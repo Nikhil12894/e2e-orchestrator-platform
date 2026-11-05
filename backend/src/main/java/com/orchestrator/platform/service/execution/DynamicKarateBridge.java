@@ -403,6 +403,11 @@ public class DynamicKarateBridge {
         boolean exclude = Boolean.TRUE.equals(step.get("excludeFromReport")) || "true".equalsIgnoreCase(String.valueOf(step.get("excludeFromReport")));
         stepResult.setExcludeFromReport(exclude);
 
+        if (extractedVars != null && !extractedVars.isEmpty()) {
+            Map<String, Object> ctx = activeContexts.computeIfAbsent(executionId, k -> new ConcurrentHashMap<>());
+            ctx.putAll(extractedVars);
+        }
+
         List<ExecutionStepResult> list = activeStepResults.computeIfAbsent(executionId, k -> Collections.synchronizedList(new ArrayList<>()));
         list.add(stepResult);
 
@@ -415,6 +420,10 @@ public class DynamicKarateBridge {
     }
 
     public static void onWorkflowComplete(String executionId, Map<String, Object> finalContext) {
+        if (finalContext != null) {
+            Map<String, Object> ctx = activeContexts.computeIfAbsent(executionId, k -> new ConcurrentHashMap<>());
+            ctx.putAll(finalContext);
+        }
         if (instance == null) return;
         UUID execId = parseUuid(executionId);
         instance.logBroadcaster.broadcast(new ExecutionEventDto(
