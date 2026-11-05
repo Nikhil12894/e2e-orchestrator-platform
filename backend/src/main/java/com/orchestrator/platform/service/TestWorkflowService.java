@@ -26,6 +26,7 @@ import com.orchestrator.platform.domain.model.ast.DbPollStepConfig;
 import com.orchestrator.platform.domain.model.ast.HttpRequestStepConfig;
 import com.orchestrator.platform.domain.model.ast.KafkaAssertStepConfig;
 import com.orchestrator.platform.domain.model.ast.StepAssertion;
+import com.orchestrator.platform.domain.model.ast.SubWorkflowStepConfig;
 import com.orchestrator.platform.domain.model.ast.TransformStepConfig;
 import com.orchestrator.platform.domain.model.ast.VariableExtraction;
 import com.orchestrator.platform.domain.model.ast.WorkflowAst;
@@ -469,6 +470,25 @@ public class TestWorkflowService {
             String script = (String) data.getOrDefault("script", "function(ctx) { return { timestamp: new Date().toISOString() }; }");
             transConfig.setScript(script);
             step.setTransformConfig(transConfig);
+
+        } else if (nodeType.toLowerCase().contains("subworkflow") || nodeType.toLowerCase().contains("sub_workflow")) {
+            step.setType(StepType.SUB_WORKFLOW);
+            SubWorkflowStepConfig subConfig = new SubWorkflowStepConfig();
+            subConfig.setWorkflowId((String) data.get("workflowId"));
+            subConfig.setWorkflowName((String) data.get("workflowName"));
+            if (data.get("inputVariables") instanceof Map<?, ?> inVars) {
+                subConfig.setInputVariables((Map<String, Object>) inVars);
+            }
+            if (data.containsKey("inheritParentContext")) {
+                subConfig.setInheritParentContext(!"false".equalsIgnoreCase(String.valueOf(data.get("inheritParentContext"))));
+            }
+            if (data.containsKey("inheritEnvAndSecrets")) {
+                subConfig.setInheritEnvAndSecrets(!"false".equalsIgnoreCase(String.valueOf(data.get("inheritEnvAndSecrets"))));
+            }
+            if (data.containsKey("inheritFlowHeaders")) {
+                subConfig.setInheritFlowHeaders(!"false".equalsIgnoreCase(String.valueOf(data.get("inheritFlowHeaders"))));
+            }
+            step.setSubWorkflowConfig(subConfig);
         }
 
         // Extractions

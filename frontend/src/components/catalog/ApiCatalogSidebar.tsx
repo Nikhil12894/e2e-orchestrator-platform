@@ -16,6 +16,7 @@ import {
   FolderOpen,
   Trash2,
   AlertTriangle,
+  Workflow,
   X
 } from 'lucide-react';
 import { ApiEndpoint, HttpMethod } from '../../types/workflow';
@@ -226,7 +227,7 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
           <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-2 px-1">
             Drag Nodes to Canvas
           </span>
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-5 gap-1">
             <div
               draggable
               onDragStart={(e) =>
@@ -240,10 +241,10 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
                   timeoutMs: 15000,
                 })
               }
-              className="flex flex-col items-center justify-center p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-amber-500/40 hover:bg-amber-500/5 cursor-grab active:cursor-grabbing transition-all group shadow-sm"
+              className="flex flex-col items-center justify-center p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-amber-500/40 hover:bg-amber-500/5 cursor-grab active:cursor-grabbing transition-all group shadow-sm"
               title="Poll database via SQL query until condition is met"
             >
-              <Database className="w-4 h-4 text-amber-500 dark:text-amber-400 mb-1 group-hover:scale-110 transition-transform" />
+              <Database className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 mb-1 group-hover:scale-110 transition-transform" />
               <span className="text-[9px] font-medium text-slate-700 dark:text-slate-300">DB Poll</span>
             </div>
 
@@ -255,10 +256,10 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
                   script: "function(ctx) {\n  return {\n    timestamp: new Date().toISOString()\n  };\n}",
                 })
               }
-              className="flex flex-col items-center justify-center p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-violet-500/40 hover:bg-violet-500/5 cursor-grab active:cursor-grabbing transition-all group shadow-sm"
+              className="flex flex-col items-center justify-center p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-violet-500/40 hover:bg-violet-500/5 cursor-grab active:cursor-grabbing transition-all group shadow-sm"
               title="Execute custom JavaScript function and return transformed context variables"
             >
-              <Code2 className="w-4 h-4 text-violet-500 dark:text-violet-400 mb-1 group-hover:scale-110 transition-transform" />
+              <Code2 className="w-3.5 h-3.5 text-violet-500 dark:text-violet-400 mb-1 group-hover:scale-110 transition-transform" />
               <span className="text-[9px] font-medium text-slate-700 dark:text-slate-300">Transform</span>
             </div>
 
@@ -273,10 +274,10 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
                   expectedValue: 'CONFIRMED',
                 })
               }
-              className="flex flex-col items-center justify-center p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-purple-500/40 hover:bg-purple-500/5 cursor-grab active:cursor-grabbing transition-all group shadow-sm"
+              className="flex flex-col items-center justify-center p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-purple-500/40 hover:bg-purple-500/5 cursor-grab active:cursor-grabbing transition-all group shadow-sm"
               title="Assert message delivery on Kafka topic"
             >
-              <Radio className="w-4 h-4 text-purple-500 dark:text-purple-400 mb-1 group-hover:scale-110 transition-transform" />
+              <Radio className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 mb-1 group-hover:scale-110 transition-transform" />
               <span className="text-[9px] font-medium text-slate-700 dark:text-slate-300">Kafka</span>
             </div>
 
@@ -288,11 +289,31 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
                   delayMs: 2000,
                 })
               }
-              className="flex flex-col items-center justify-center p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-cyan-500/40 hover:bg-cyan-500/5 cursor-grab active:cursor-grabbing transition-all group shadow-sm"
+              className="flex flex-col items-center justify-center p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-cyan-500/40 hover:bg-cyan-500/5 cursor-grab active:cursor-grabbing transition-all group shadow-sm"
               title="Pause execution flow for async processing"
             >
-              <Timer className="w-4 h-4 text-cyan-500 dark:text-cyan-400 mb-1 group-hover:scale-110 transition-transform" />
+              <Timer className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400 mb-1 group-hover:scale-110 transition-transform" />
               <span className="text-[9px] font-medium text-slate-700 dark:text-slate-300">Delay</span>
+            </div>
+
+            <div
+              draggable
+              onDragStart={(e) =>
+                handleDragGenericStep(e, 'subWorkflow', {
+                  name: 'Call Sub-Workflow',
+                  workflowId: '',
+                  workflowName: '',
+                  inputVariables: {},
+                  inheritParentContext: true,
+                  inheritEnvAndSecrets: true,
+                  inheritFlowHeaders: true,
+                })
+              }
+              className="flex flex-col items-center justify-center p-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-500/40 hover:bg-indigo-500/5 cursor-grab active:cursor-grabbing transition-all group shadow-sm"
+              title="Compose and call an existing workflow with variable inheritance"
+            >
+              <Workflow className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 mb-1 group-hover:scale-110 transition-transform" />
+              <span className="text-[9px] font-medium text-slate-700 dark:text-slate-300">Sub-Flow</span>
             </div>
           </div>
         </div>

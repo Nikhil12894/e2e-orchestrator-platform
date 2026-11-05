@@ -1,4 +1,4 @@
-import React, { useState, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import {
   X,
   Settings,
@@ -7,6 +7,10 @@ import {
   Radio,
   Timer,
   Code2,
+  Workflow,
+  Layers,
+  ArrowRightLeft,
+  ShieldCheck,
   RotateCcw,
   EyeOff,
   Plus,
@@ -42,6 +46,7 @@ interface NodeConfigDrawerProps {
   envSecrets?: Record<string, Record<string, string>>;
   secrets?: Record<string, string>;
   activeEnvironment?: string;
+  currentWorkflowId?: string;
 }
 
 export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
@@ -57,10 +62,15 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
   envSecrets = {},
   secrets = {},
   activeEnvironment = 'default',
+  currentWorkflowId,
 }) => {
   const [activeTab, setActiveTab] = useState<'config' | 'extractions' | 'assertions'>('config');
   const [isVarModalOpen, setIsVarModalOpen] = useState(false);
   const [varTargetField, setVarTargetField] = useState<string | null>(null);
+
+  // Sub-Workflow state
+  const [availableWorkflows, setAvailableWorkflows] = useState<Array<{ id: string; name: string; description?: string }>>([]);
+  const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false);
 
   // Database Connection Testing state
   const [isTestingDb, setIsTestingDb] = useState(false);
@@ -76,10 +86,31 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
     errorMessage?: string;
   } | null>(null);
 
+  const nodeType = selectedNode?.type;
+  const isSubWorkflowNode = nodeType === 'subWorkflow' || selectedNode?.data?.type === 'SUB_WORKFLOW';
+
+  useEffect(() => {
+    if (isOpen && isSubWorkflowNode) {
+      setIsLoadingWorkflows(true);
+      workflowApi.getAllWorkflows()
+        .then((wfList) => {
+          const filtered = wfList
+            .filter((w) => !currentWorkflowId || w.id !== currentWorkflowId)
+            .map((w) => ({ id: w.id, name: w.name, description: w.description }));
+          setAvailableWorkflows(filtered);
+        })
+        .catch((err) => {
+          console.error('Failed to load workflows for sub-workflow step', err);
+        })
+        .finally(() => {
+          setIsLoadingWorkflows(false);
+        });
+    }
+  }, [isOpen, isSubWorkflowNode, currentWorkflowId]);
+
   if (!isOpen || !selectedNode) return null;
 
   const data = selectedNode.data;
-  const nodeType = selectedNode.type;
 
   const update = (patch: Partial<CanvasNodeData>) => {
     onUpdateNodeData(selectedNode.id, patch);
@@ -201,6 +232,11 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
           [hKey]: currentVal + varExpr,
         },
       });
+    } else if (varTargetField.startsWith('param_')) {
+      const pKey = varTargetField.substring(6);
+      const curVars = { ...(data.inputVariables || {}) };
+      curVars[pKey] = (curVars[pKey] || '') + varExpr;
+      update({ inputVariables: curVars });
     } else if (varTargetField === 'body') {
       try {
         const bodyStr = typeof data.body === 'string' ? data.body : JSON.stringify(data.body, null, 2);
@@ -239,17 +275,69 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
     }
   };
 
+  // Input Variables helpers for Sub-Workflow
+  const inputVarEntries = Object.entries(data.inputVariables || {});
+
+  const handleAddInputVariable = () => {
+    const curVars = { ...(data.inputVariables || {}) };
+    let newKey = `param_${inputVarEntries.length + 1}`;
+    let counter = 1;
+    while (curVars[newKey] !== undefined) {
+      counter++;
+      newKey = `param_${inputVarEntries.length + counter}`;
+    }
+    curVars[newKey] = '';
+    update({ inputVariables: curVars });
+  };
+
+  const handleUpdateInputVariableKey = (oldKey: string, newKey: string) => {
+    if (!newKey || oldKey === newKey) return;
+    const curVars = { ...(data.inputVariables || {}) };
+    const val = curVars[oldKey];
+    delete curVars[oldKey];
+    curVars[newKey] = val;
+    update({ inputVariables: curVars });
+  };
+
+  const handleUpdateInputVariableValue = (key: string, value: any) => {
+    const curVars = { ...(data.inputVariables || {}) };
+    curVars[key] = value;
+    update({ inputVariables: curVars });
+  };
+
+  const handleRemoveInputVariable = (key: string) => {
+    const curVars = { ...(data.inputVariables || {}) };
+    delete curVars[key];
+    update({ inputVariables: curVars });
+  };
+
   // Extractions handler
   const isDbNode = nodeType === 'dbPoll' || data.type === 'DB_POLL';
 
   const addExtraction = () => {
     const list: VariableExtraction[] = [...(data.extractions || [])];
-    list.push({
-      variableName: isDbNode ? `db_var_${list.length + 1}` : `var_${list.length + 1}`,
-      source: isDbNode ? 'DB_ROW_COLUMN' : 'RESPONSE_BODY',
-      jsonPath: isDbNode ? 'STATUS' : '$.id',
-      defaultValue: '',
-    });
+    if (isSubWorkflowNode) {
+      list.push({
+        variableName: `sub_var_${list.length + 1}`,
+        source: 'SUB_WORKFLOW_VARIABLE',
+        jsonPath: 'authToken',
+        defaultValue: '',
+      });
+    } else if (isDbNode) {
+      list.push({
+        variableName: `db_var_${list.length + 1}`,
+        source: 'DB_ROW_COLUMN',
+        jsonPath: 'STATUS',
+        defaultValue: '',
+      });
+    } else {
+      list.push({
+        variableName: `var_${list.length + 1}`,
+        source: 'RESPONSE_BODY',
+        jsonPath: '$.id',
+        defaultValue: '',
+      });
+    }
     update({ extractions: list });
   };
 
@@ -294,12 +382,17 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500 dark:text-blue-400">
+            <div className={`p-1.5 rounded-lg ${
+              isSubWorkflowNode
+                ? 'bg-indigo-500/10 text-indigo-500 dark:text-indigo-400'
+                : 'bg-blue-500/10 text-blue-500 dark:text-blue-400'
+            }`}>
               {nodeType === 'httpRequest' && <Globe className="w-4 h-4" />}
               {nodeType === 'dbPoll' && <Database className="w-4 h-4 text-amber-500 dark:text-amber-400" />}
               {nodeType === 'kafkaAssert' && <Radio className="w-4 h-4 text-purple-500 dark:text-purple-400" />}
               {nodeType === 'delay' && <Timer className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />}
               {nodeType === 'transform' && <Code2 className="w-4 h-4 text-violet-500 dark:text-violet-400" />}
+              {isSubWorkflowNode && <Workflow className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />}
             </div>
             <div className="min-w-0">
               <h3 className="font-semibold text-xs text-slate-800 dark:text-slate-100 truncate">{data.name || 'Step Configuration'}</h3>
@@ -1189,6 +1282,206 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                 </div>
               )}
 
+              {/* Sub-Workflow Step */}
+              {isSubWorkflowNode && (
+                <div className="space-y-4">
+                  {/* Target Workflow Picker Card */}
+                  <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                        <label className="text-[11px] font-semibold text-slate-300">Target Workflow</label>
+                      </div>
+                      {isLoadingWorkflows && (
+                        <span className="flex items-center gap-1 text-[10px] text-indigo-400">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Loading...
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-tight">
+                      Select an existing workflow to execute as a modular sub-step. Child steps run sequentially with inherited context.
+                    </p>
+
+                    <select
+                      value={data.workflowId || ''}
+                      onChange={(e) => {
+                        const targetId = e.target.value;
+                        const targetWf = availableWorkflows.find((w) => w.id === targetId);
+                        update({
+                          workflowId: targetId,
+                          workflowName: targetWf ? targetWf.name : '',
+                        });
+                      }}
+                      className="w-full px-2.5 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs font-medium text-slate-200 focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="">-- Choose a workflow --</option>
+                      {availableWorkflows.map((wf) => (
+                        <option key={wf.id} value={wf.id}>
+                          {wf.name} ({wf.id.substring(0, 8)}...)
+                        </option>
+                      ))}
+                    </select>
+
+                    {data.workflowId ? (
+                      <div className="p-2 rounded bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-between text-[11px]">
+                        <span className="text-indigo-300 font-medium truncate">
+                          {data.workflowName || data.workflowId}
+                        </span>
+                        <span className="text-[9px] font-mono text-indigo-400 bg-indigo-950/50 px-1.5 py-0.5 rounded border border-indigo-800">
+                          ID: {data.workflowId.substring(0, 8)}...
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="p-2 rounded bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-300">
+                        Please select a target workflow to execute.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Context & Scope Inheritance Card */}
+                  <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3">
+                    <div className="flex items-center gap-1.5">
+                      <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-400" />
+                      <span className="text-[11px] font-semibold text-slate-300">Context & Scope Inheritance</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-tight">
+                      Configure what runtime data from the parent workflow is automatically propagated into this child execution.
+                    </p>
+
+                    {/* Inherit Parent Variables */}
+                    <label className="flex items-start gap-2.5 cursor-pointer pb-2 border-b border-slate-800/80">
+                      <input
+                        type="checkbox"
+                        checked={data.inheritParentContext !== false}
+                        onChange={(e) => update({ inheritParentContext: e.target.checked })}
+                        className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-0 cursor-pointer"
+                      />
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-medium text-slate-200">Inherit Parent Variables</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                            Preceding Steps
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 block leading-tight">
+                          Automatically exposes all variables produced by upstream parent steps to the child workflow.
+                        </span>
+                      </div>
+                    </label>
+
+                    {/* Inherit Environment & Secrets */}
+                    <label className="flex items-start gap-2.5 cursor-pointer pb-2 border-b border-slate-800/80">
+                      <input
+                        type="checkbox"
+                        checked={data.inheritEnvAndSecrets !== false}
+                        onChange={(e) => update({ inheritEnvAndSecrets: e.target.checked })}
+                        className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-0 cursor-pointer"
+                      />
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-medium text-slate-200">Inherit Environment & Secrets</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                            <ShieldCheck className="w-2.5 h-2.5" />
+                            Masked
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 block leading-tight">
+                          Passes active dynamic environment variables (<code className="text-indigo-400">{"${$env:KEY}"}</code>) and secrets (<code className="text-indigo-400">{"${$secret:PASS}"}</code>) with automated log redaction.
+                        </span>
+                      </div>
+                    </label>
+
+                    {/* Inherit Global Flow Headers */}
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={data.inheritFlowHeaders !== false}
+                        onChange={(e) => update({ inheritFlowHeaders: e.target.checked })}
+                        className="w-4 h-4 mt-0.5 rounded border-slate-700 bg-slate-900 text-indigo-500 focus:ring-0 cursor-pointer"
+                      />
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-medium text-slate-200">Inherit Global Flow Headers</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                            HTTP Flow Headers
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 block leading-tight">
+                          Propagates parent flow headers (e.g. Authorization, X-Correlation-ID) into all child HTTP requests.
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Input Parameters Overrides Card */}
+                  <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                        <label className="text-[11px] font-semibold text-slate-300">Input Parameters (Overrides)</label>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddInputVariable}
+                        className="flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 text-[10px] font-medium transition-colors"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Add Parameter
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-tight">
+                      Explicitly define or override variables passed into child workflow context. Dynamic variables (e.g. <code className="text-indigo-400">{"${orderId}"}</code>) are resolved before execution.
+                    </p>
+
+                    {inputVarEntries.length === 0 ? (
+                      <div className="p-2.5 rounded bg-slate-900/60 border border-slate-800/80 text-center">
+                        <span className="text-[10px] text-slate-500 italic">No input parameters configured. Child will rely solely on inherited variables.</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {inputVarEntries.map(([key, val], idx) => (
+                          <div key={idx} className="flex items-center gap-1.5 p-1.5 rounded bg-slate-900 border border-slate-800">
+                            <input
+                              type="text"
+                              value={key}
+                              onChange={(e) => handleUpdateInputVariableKey(key, e.target.value)}
+                              placeholder="paramName"
+                              className="w-2/5 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[11px] font-mono text-indigo-300 focus:outline-none focus:border-indigo-500"
+                            />
+                            <div className="relative flex-1">
+                              <input
+                                type="text"
+                                value={typeof val === 'string' ? val : JSON.stringify(val)}
+                                onChange={(e) => handleUpdateInputVariableValue(key, e.target.value)}
+                                placeholder="value or ${var}"
+                                className="w-full pl-2 pr-7 py-1 bg-slate-950 border border-slate-800 rounded text-[11px] font-mono text-slate-200 focus:outline-none focus:border-indigo-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => openVarSelector(`param_${key}`)}
+                                title="Insert Variable"
+                                className="absolute right-1 top-1/2 -translate-y-1/2 px-1 py-0.5 text-[10px] font-mono rounded bg-slate-800 hover:bg-slate-700 text-indigo-400 hover:text-indigo-300 transition-colors"
+                              >
+                                {'{'}
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveInputVariable(key)}
+                              className="p-1 text-slate-500 hover:text-rose-400 transition-colors"
+                              title="Delete Parameter"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Step Execution & Reporting Settings */}
               <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3">
                 <span className="text-[11px] font-semibold text-slate-300 block">Execution & Reporting Options</span>
@@ -1337,10 +1630,17 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-xs text-slate-400">
-                    {isDbNode
+                    {isSubWorkflowNode
+                      ? 'Extract child workflow output variables into parent runtime context'
+                      : isDbNode
                       ? 'Extract column values from the matched DB row into runtime variables'
                       : 'Extract fields into runtime variables'}
                   </span>
+                  {isSubWorkflowNode && (
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      Extracts child variables (e.g. <code className="text-indigo-400">authToken</code>, <code className="text-indigo-400">orderId</code>) or evaluates JSONPath (<code className="text-indigo-400">$.user.id</code>) from child context.
+                    </p>
+                  )}
                   {isDbNode && (
                     <p className="text-[10px] text-slate-500 mt-0.5">
                       Case-insensitive column lookup. Matches <code className="text-amber-400">STATUS</code>, <code className="text-amber-400">row.STATUS</code>, or <code className="text-amber-400">$.STATUS</code>.
@@ -1372,7 +1672,7 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                       type="text"
                       value={ex.variableName}
                       onChange={(e) => updateExtraction(i, { variableName: e.target.value })}
-                      placeholder={isDbNode ? "e.g. orderStatus or refId" : "e.g. authToken"}
+                      placeholder={isSubWorkflowNode ? "e.g. parentToken or childOrderId" : isDbNode ? "e.g. orderStatus or refId" : "e.g. authToken"}
                       className="w-full px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs font-mono text-emerald-400 focus:outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -1385,7 +1685,12 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                         onChange={(e) => updateExtraction(i, { source: e.target.value as any })}
                         className="w-full px-2 py-1 bg-slate-900 border border-slate-800 rounded text-[11px] text-slate-200 focus:outline-none"
                       >
-                        {isDbNode ? (
+                        {isSubWorkflowNode ? (
+                          <>
+                            <option value="SUB_WORKFLOW_VARIABLE">Sub-Workflow Output Variable</option>
+                            <option value="RESPONSE_BODY">Full Output Context (JSONPath)</option>
+                          </>
+                        ) : isDbNode ? (
                           <>
                             <option value="DB_ROW_COLUMN">DB Row Column</option>
                             <option value="RESPONSE_BODY">Full DB Response / JSONPath</option>
@@ -1402,13 +1707,13 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                     </div>
                     <div>
                       <label className="block text-[10px] text-slate-400 mb-0.5">
-                        {isDbNode ? 'Column Name / JSONPath' : 'JSONPath'}
+                        {isSubWorkflowNode ? 'Child Variable Name / JSONPath' : isDbNode ? 'Column Name / JSONPath' : 'JSONPath'}
                       </label>
                       <input
                         type="text"
                         value={ex.jsonPath}
                         onChange={(e) => updateExtraction(i, { jsonPath: e.target.value })}
-                        placeholder={isDbNode ? "e.g. STATUS, REF_ID, or row.STATUS" : "$.data.token"}
+                        placeholder={isSubWorkflowNode ? "e.g. authToken, orderId, or $.status" : isDbNode ? "e.g. STATUS, REF_ID, or row.STATUS" : "$.data.token"}
                         className="w-full px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs font-mono text-slate-200 focus:outline-none"
                       />
                     </div>

@@ -26,4 +26,7 @@ Feature: Dynamic Step Executor
     # Branch 5: JavaScript Data Transform
     * if (stepType == 'TRANSFORM') karate.set('stepRes', karate.call('classpath:karate/execute-transform.feature', { resolvedStep: resolvedStep, executionId: executionId, globalContext: globalContext }))
 
+    # Branch 6: Sub-Workflow Execution
+    * if (stepType == 'SUB_WORKFLOW') karate.set('stepRes', karate.call('classpath:karate/execute-subworkflow.feature', { resolvedStep: resolvedStep, executionId: executionId, globalContext: globalContext }))
+
     * def extractedVars = (karate.get('stepRes') && stepRes.extractedVars) ? stepRes.extractedVars : {}

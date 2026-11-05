@@ -643,6 +643,7 @@ export function App() {
           envSecrets={selectedWorkflow?.canvasState?.envSecrets}
           secrets={selectedWorkflow?.canvasState?.secrets}
           activeEnvironment={environment}
+          currentWorkflowId={selectedWorkflow?.id}
         />
       </div>
 

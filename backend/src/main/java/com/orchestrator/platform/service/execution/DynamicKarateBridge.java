@@ -1,15 +1,20 @@
 package com.orchestrator.platform.service.execution;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.orchestrator.platform.domain.entity.TestWorkflowEntity;
 import com.orchestrator.platform.domain.enums.ExecutionStatus;
 import com.orchestrator.platform.domain.enums.StepType;
 import com.orchestrator.platform.domain.model.ast.DbPollStepConfig;
 import com.orchestrator.platform.domain.model.ast.KafkaAssertStepConfig;
+import com.orchestrator.platform.domain.model.ast.SubWorkflowStepConfig;
+import com.orchestrator.platform.domain.model.ast.WorkflowAst;
 import com.orchestrator.platform.domain.model.dto.ExecutionEventDto;
 import com.orchestrator.platform.domain.model.dto.ExecutionStepResult;
+import com.orchestrator.platform.repository.TestWorkflowRepository;
 import com.orchestrator.platform.service.WorkflowContextEngine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
@@ -29,6 +34,7 @@ public class DynamicKarateBridge {
     private final KafkaAssertExecutor kafkaAssertExecutor;
     private final ExecutionLogBroadcaster logBroadcaster;
     private final ObjectMapper objectMapper;
+    private final TestWorkflowRepository workflowRepository;
 
     // Per-execution live step results and contexts
     private static final Map<String, Map<String, Object>> activePayloads = new ConcurrentHashMap<>();
@@ -42,11 +48,22 @@ public class DynamicKarateBridge {
                                KafkaAssertExecutor kafkaAssertExecutor,
                                ExecutionLogBroadcaster logBroadcaster,
                                ObjectMapper objectMapper) {
+        this(contextEngine, dbPollExecutor, kafkaAssertExecutor, logBroadcaster, objectMapper, null);
+    }
+
+    @Autowired
+    public DynamicKarateBridge(WorkflowContextEngine contextEngine,
+                               DbPollExecutor dbPollExecutor,
+                               KafkaAssertExecutor kafkaAssertExecutor,
+                               ExecutionLogBroadcaster logBroadcaster,
+                               ObjectMapper objectMapper,
+                               @Autowired(required = false) TestWorkflowRepository workflowRepository) {
         this.contextEngine = contextEngine;
         this.dbPollExecutor = dbPollExecutor;
         this.kafkaAssertExecutor = kafkaAssertExecutor;
         this.logBroadcaster = logBroadcaster;
         this.objectMapper = objectMapper;
+        this.workflowRepository = workflowRepository;
         DynamicKarateBridge.instance = this;
     }
 
@@ -137,6 +154,10 @@ public class DynamicKarateBridge {
         if (instance == null) return;
         UUID execId = parseUuid(executionId);
         UUID wfId = parseUuid(workflowId);
+        Map<String, Object> payload = activePayloads.computeIfAbsent(executionId, k -> new ConcurrentHashMap<>());
+        if (workflowId != null) {
+            payload.put("workflowId", workflowId);
+        }
         instance.logBroadcaster.broadcast(new ExecutionEventDto(
                 execId, wfId, "WORKFLOW_STARTED", null, null,
                 ExecutionStatus.RUNNING, "Starting workflow execution (" + totalSteps + " steps queued)",
@@ -293,6 +314,164 @@ public class DynamicKarateBridge {
     }
 
     @SuppressWarnings("unchecked")
+    public static Map<String, Object> prepareSubWorkflow(String executionId, Map<String, Object> step, Map<String, Object> globalContext) {
+        if (instance == null) {
+            return Map.of("success", false, "errorMessage", "Bridge not initialized", "steps", Collections.emptyList());
+        }
+
+        try {
+            Object subCfgObj = step.get("subWorkflowConfig");
+            SubWorkflowStepConfig config = instance.objectMapper.convertValue(subCfgObj, SubWorkflowStepConfig.class);
+            if (config == null || config.getWorkflowId() == null || config.getWorkflowId().isBlank()) {
+                return Map.of("success", false, "errorMessage", "No sub-workflow ID configured", "steps", Collections.emptyList());
+            }
+
+            UUID targetWfId = UUID.fromString(config.getWorkflowId().trim());
+
+            // Recursion & Circular dependency guard: check call stack in parent context
+            String callStackKey = "_subWorkflowCallStack";
+            Map<String, Object> parentCtx = activeContexts.getOrDefault(executionId, Collections.emptyMap());
+            Set<UUID> callStack = new HashSet<>();
+            if (parentCtx.get(callStackKey) instanceof Collection<?> col) {
+                for (Object item : col) {
+                    if (item instanceof UUID u) callStack.add(u);
+                    else if (item != null) {
+                        try { callStack.add(UUID.fromString(item.toString().trim())); } catch (Exception ignored) {}
+                    }
+                }
+            }
+
+            // Also include current workflow ID from active payload
+            Map<String, Object> activePayload = activePayloads.getOrDefault(executionId, Collections.emptyMap());
+            if (activePayload.get("workflowId") != null) {
+                try { callStack.add(UUID.fromString(activePayload.get("workflowId").toString().trim())); } catch (Exception ignored) {}
+            }
+
+            if (callStack.contains(targetWfId)) {
+                String errorMsg = "Circular sub-workflow call detected for workflow ID: " + targetWfId;
+                log.error(errorMsg);
+                return Map.of("success", false, "errorMessage", errorMsg, "steps", Collections.emptyList());
+            }
+
+            if (instance.workflowRepository == null) {
+                return Map.of("success", false, "errorMessage", "Workflow repository not available in bridge", "steps", Collections.emptyList());
+            }
+
+            Optional<TestWorkflowEntity> subOpt = instance.workflowRepository.findById(targetWfId);
+            if (subOpt.isEmpty()) {
+                String errorMsg = "Target sub-workflow not found: " + targetWfId;
+                log.error(errorMsg);
+                return Map.of("success", false, "errorMessage", errorMsg, "steps", Collections.emptyList());
+            }
+
+            TestWorkflowEntity subWf = subOpt.get();
+            WorkflowAst ast = subWf.getWorkflowAst();
+            List<?> subSteps = Collections.emptyList();
+            if (ast != null && ast.getSteps() != null) {
+                subSteps = instance.objectMapper.convertValue(ast.getSteps(), List.class);
+            }
+
+            // Build child execution context
+            Map<String, Object> childContext = new LinkedHashMap<>();
+
+            // 1. Inherit parent runtime variables (from previous steps)
+            if (config.isInheritParentContext()) {
+                if (globalContext != null) {
+                    childContext.putAll(globalContext);
+                }
+                childContext.putAll(parentCtx);
+            }
+
+            // 2. Inherit environment properties and secrets
+            if (config.isInheritEnvAndSecrets()) {
+                if (parentCtx.containsKey("env")) {
+                    childContext.put("env", parentCtx.get("env"));
+                }
+                if (parentCtx.containsKey("secrets")) {
+                    childContext.put("secrets", parentCtx.get("secrets"));
+                    if (parentCtx.get("secrets") instanceof Map<?, ?> secMap) {
+                        for (Map.Entry<?, ?> se : secMap.entrySet()) {
+                            if (se.getKey() != null && se.getValue() != null) {
+                                childContext.put(se.getKey().toString(), se.getValue());
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Child workflow's own static variables
+            if (ast != null && ast.getVariables() != null) {
+                childContext.putAll(ast.getVariables());
+            }
+
+            // 4. Resolve and apply explicit input variables passed by parent step
+            if (config.getInputVariables() != null && !config.getInputVariables().isEmpty()) {
+                Object resolvedInputs = instance.contextEngine.resolveObject(config.getInputVariables(), parentCtx);
+                if (resolvedInputs instanceof Map<?, ?> inMap) {
+                    for (Map.Entry<?, ?> entry : inMap.entrySet()) {
+                        if (entry.getKey() != null) {
+                            childContext.put(entry.getKey().toString(), entry.getValue());
+                        }
+                    }
+                }
+            }
+
+            // 5. Update call stack in child context to prevent child from calling any parent in stack
+            Set<UUID> nextCallStack = new HashSet<>(callStack);
+            nextCallStack.add(targetWfId);
+            childContext.put(callStackKey, nextCallStack);
+
+            // 6. Inherit / compute flow headers
+            Map<String, Object> childFlowHeaders = new LinkedHashMap<>();
+            if (config.isInheritFlowHeaders()) {
+                Object parentHeadersObj = activePayload.get("flowHeaders");
+                if (parentHeadersObj instanceof Map<?, ?> parentH) {
+                    for (Map.Entry<?, ?> entry : parentH.entrySet()) {
+                        if (entry.getKey() != null) {
+                            childFlowHeaders.put(entry.getKey().toString(), entry.getValue());
+                        }
+                    }
+                }
+            }
+            if (ast != null && ast.getDefaultHeaders() != null) {
+                for (Map.Entry<String, String> e : ast.getDefaultHeaders().entrySet()) {
+                    childFlowHeaders.put(e.getKey(), instance.contextEngine.resolveString(e.getValue(), childContext));
+                }
+            }
+
+            instance.logBroadcaster.emitLog(parseUuid(executionId), null,
+                    String.valueOf(step.get("id")), String.valueOf(step.get("name")),
+                    "Executing SUB_WORKFLOW step: Calling workflow '" + subWf.getName() + "' [" + targetWfId + "] with " + subSteps.size() + " steps");
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("success", true);
+            result.put("workflowId", targetWfId.toString());
+            result.put("workflowName", subWf.getName());
+            result.put("steps", subSteps);
+            result.put("initialContext", childContext);
+            result.put("flowHeaders", childFlowHeaders);
+            return result;
+
+        } catch (Exception e) {
+            log.error("Failed to prepare sub-workflow: {}", e.getMessage(), e);
+            return Map.of("success", false, "errorMessage", e.getMessage(), "steps", Collections.emptyList());
+        }
+    }
+
+    public static Map<String, Object> finishSubWorkflow(String executionId, Map<String, Object> step, Map<String, Object> subContext) {
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("success", true);
+        res.put("outputVariables", subContext != null ? subContext : Collections.emptyMap());
+
+        if (instance != null) {
+            instance.logBroadcaster.emitLog(parseUuid(executionId), null,
+                    String.valueOf(step.get("id")), String.valueOf(step.get("name")),
+                    "Sub-Workflow execution completed. Captured " + (subContext != null ? subContext.size() : 0) + " output context variables");
+        }
+        return res;
+    }
+
+    @SuppressWarnings("unchecked")
     public static Map<String, Object> extractVariables(String executionId, Map<String, Object> step,
                                                         Object responseBody, int httpStatus,
                                                         Map<String, Object> headers) {
@@ -305,6 +484,7 @@ public class DynamicKarateBridge {
         List<Map<String, Object>> extractions = (List<Map<String, Object>>) extractionsObj;
         Map<String, Object> context = activeContexts.computeIfAbsent(executionId, k -> new ConcurrentHashMap<>());
         boolean isDbStep = "DB_POLL".equalsIgnoreCase(String.valueOf(step.get("type")));
+        boolean isSubWfStep = "SUB_WORKFLOW".equalsIgnoreCase(String.valueOf(step.get("type")));
 
         for (Map<String, Object> ext : extractions) {
             String varName = (String) ext.get("variableName");
@@ -317,10 +497,11 @@ public class DynamicKarateBridge {
                 value = httpStatus;
             } else if ("RESPONSE_HEADER".equalsIgnoreCase(source) && headers != null) {
                 value = headers.get(jsonPath);
-            } else if ("DB_ROW_COLUMN".equalsIgnoreCase(source) || "DB_COLUMN".equalsIgnoreCase(source)) {
+            } else if ("DB_ROW_COLUMN".equalsIgnoreCase(source) || "DB_COLUMN".equalsIgnoreCase(source)
+                    || "SUB_WORKFLOW_VARIABLE".equalsIgnoreCase(source) || "SUB_WORKFLOW".equalsIgnoreCase(source)) {
                 value = extractDbOrMapValue(responseBody, jsonPath);
             } else if (responseBody != null) {
-                if (isDbStep || responseBody instanceof Map) {
+                if (isDbStep || isSubWfStep || responseBody instanceof Map) {
                     value = extractDbOrMapValue(responseBody, jsonPath);
                 } else {
                     value = instance.contextEngine.evaluateJsonPath(responseBody, jsonPath);

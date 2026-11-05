@@ -21,6 +21,7 @@ import { DbPollNode } from './nodes/DbPollNode';
 import { KafkaAssertNode } from './nodes/KafkaAssertNode';
 import { DelayNode } from './nodes/DelayNode';
 import { TransformNode } from './nodes/TransformNode';
+import { SubWorkflowNode } from './nodes/SubWorkflowNode';
 import { RemovableEdge } from './edges/RemovableEdge';
 import { CanvasNode, CanvasEdge } from '../../types/workflow';
 import { useTheme } from '../../context/ThemeContext';
@@ -33,6 +34,7 @@ const nodeTypes: any = {
   kafkaAssert: KafkaAssertNode,
   delay: DelayNode,
   transform: TransformNode,
+  subWorkflow: SubWorkflowNode,
 };
 
 const edgeTypes: any = {

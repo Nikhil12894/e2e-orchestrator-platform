@@ -6,5 +6,6 @@ public enum StepType {
     KAFKA_ASSERT,
     DELAY,
     CONDITION,
-    TRANSFORM
+    TRANSFORM,
+    SUB_WORKFLOW
 }

@@ -1,6 +1,6 @@
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
-export type StepType = 'HTTP_REQUEST' | 'DB_POLL' | 'KAFKA_ASSERT' | 'DELAY' | 'CONDITION' | 'TRANSFORM';
+export type StepType = 'HTTP_REQUEST' | 'DB_POLL' | 'KAFKA_ASSERT' | 'DELAY' | 'CONDITION' | 'TRANSFORM' | 'SUB_WORKFLOW';
 
 export type ExecutionStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 
@@ -35,7 +35,7 @@ export interface StepAssertion {
 
 export interface VariableExtraction {
   variableName: string;
-  source: 'RESPONSE_BODY' | 'RESPONSE_HEADER' | 'RESPONSE_STATUS' | 'DB_ROW_COLUMN';
+  source: 'RESPONSE_BODY' | 'RESPONSE_HEADER' | 'RESPONSE_STATUS' | 'DB_ROW_COLUMN' | 'SUB_WORKFLOW_VARIABLE';
   jsonPath: string;
   defaultValue?: string;
 }
@@ -56,6 +56,15 @@ export interface HttpRequestStepConfig {
 
 export interface TransformStepConfig {
   script: string;
+}
+
+export interface SubWorkflowStepConfig {
+  workflowId: string;
+  workflowName?: string;
+  inputVariables?: Record<string, any>;
+  inheritParentContext?: boolean;
+  inheritEnvAndSecrets?: boolean;
+  inheritFlowHeaders?: boolean;
 }
 
 export interface DbPollStepConfig {
@@ -90,6 +99,7 @@ export interface WorkflowStep {
   dbPollConfig?: DbPollStepConfig;
   kafkaConfig?: KafkaAssertStepConfig;
   transformConfig?: TransformStepConfig;
+  subWorkflowConfig?: SubWorkflowStepConfig;
   delayMs?: number;
   assertions?: StepAssertion[];
   extractions?: VariableExtraction[];
@@ -136,6 +146,12 @@ export interface CanvasNodeData {
   expectedValue?: string;
   delayMs?: number;
   script?: string;
+  workflowId?: string;
+  workflowName?: string;
+  inputVariables?: Record<string, any>;
+  inheritParentContext?: boolean;
+  inheritEnvAndSecrets?: boolean;
+  inheritFlowHeaders?: boolean;
   maxAttempts?: number;
   pollIntervalMs?: number;
   retryCount?: number;
