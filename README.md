@@ -1,6 +1,13 @@
 # MeterFlow: Self-Hosted E2E Test Orchestration Platform
 
-> A production-ready, self-hosted end-to-end API & integration test orchestration platform inspired by **MeterSphere**, powered by a **Spring Boot 3 (Java 21+)** backend, an embedded **Karate DSL** execution engine, and a **React + Vite + @xyflow/react** visual flow canvas.
+[![Java](https://img.shields.io/badge/Java-25%20LTS-orange.svg?style=flat&logo=openjdk)](https://openjdk.org/projects/jdk/25/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.2-brightgreen.svg?style=flat&logo=springboot)](https://spring.io/projects/spring-boot)
+[![Karate](https://img.shields.io/badge/Karate-2.1.4-red.svg?style=flat)](https://karatelabs.github.io/karate/)
+[![React](https://img.shields.io/badge/React-19-blue.svg?style=flat&logo=react)](https://react.dev/)
+[![Docker Image](https://img.shields.io/badge/Docker-191MB%20(Optimized)-2496ED.svg?style=flat&logo=docker)](https://hub.docker.com/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+
+> A production-ready, self-hosted end-to-end API & integration test orchestration platform inspired by **MeterSphere**, powered by a **Java 25 LTS** and **Spring Boot 4.1.2** backend with **Karate 2.1.4 DSL**, and a modern **React 19 + Vite + Tailwind + @xyflow/react** visual flow canvas.
 
 ---
 
@@ -8,50 +15,63 @@
 
 ```mermaid
 flowchart TD
-    subgraph Frontend["Frontend (React 18 + Vite + Tailwind + @xyflow/react)"]
-        CatalogUI["API Catalog Sidebar\n(Swagger / OpenAPI 3.x)"]
+    subgraph Frontend["Frontend (React 19 + Vite + Tailwind + @xyflow/react)"]
+        CatalogUI["API Catalog Sidebar\n(Swagger / OpenAPI 3.x Ingest)"]
         Canvas["Visual Flow Canvas\n(@xyflow/react nodes & edges)"]
-        VarDrawer["Variable Selector Drawer\n(JSONPath & Dynamic Functions)"]
-        Console["Live Execution Console\n(SSE / WebSocket Progress & Reports)"]
+        AutoLayout["Auto Align Engine\n(Topological Hierarchy)"]
+        ThemeEngine["Theme Switcher\n(Dark / Light / System Default)"]
+        Console["Live Execution Console\n(SSE / WebSockets + Report Viewer)"]
+        Modals["Portability & Storage Modals\n(Export/Import, Webhook cURL, Disk Cleanup)"]
     end
 
-    subgraph Backend["Backend (Spring Boot 3.3 / Java 21+)"]
-        API["REST Controllers\n(/api/v1/catalog, /workflows, /executions)"]
+    subgraph Backend["Backend (Spring Boot 4.1.2 / Java 25 LTS)"]
+        API["REST Controllers\n(/workflows, /executions, /catalog)"]
+        Actuator["Spring Boot Actuator\n(/actuator/health, /actuator/info)"]
         OpenAPISvc["OpenApiCatalogService\n(swagger-parser-v3 + Smart Sample Generator)"]
-        ContextEng["WorkflowContextEngine\n(Jayway JsonPath + ${var} Resolver)"]
-        VirtualThreads["Java 21 Virtual Thread Pool\n(Executors.newVirtualThreadPerTaskExecutor)"]
+        ContextEng["WorkflowContextEngine\n(Jayway JsonPath + ${var} + ${$env:SECRET})"]
+        VirtualThreads["Java 25 Virtual Thread Pool\n(Executors.newVirtualThreadPerTaskExecutor)"]
+        RetentionSvc["Storage Retention Pruner\n(Auto-Purge & Manual Disk Reclamation)"]
         
-        subgraph KarateEngine["Dynamic Karate Execution Bridge"]
-            Bridge["DynamicKarateBridge\n(In-memory Java interop)"]
-            MasterFeature["generic-flow-executor.feature\n(Pre-compiled Master Feature)"]
-            StepFeature["execute-step.feature\n(HTTP, DB Poll, Kafka, Delay)"]
-            HikariHelper["HikariCP Pool Manager\n(Dynamic SQL Polling)"]
-            KafkaHelper["KafkaAssertExecutor\n(Event Stream Verification)"]
+        subgraph KarateEngine["Dynamic Karate 2.1.4 Execution Bridge"]
+            Runner["DynamicKarateRunner\n(Workflow-attributed dynamic feature generator)"]
+            Bridge["DynamicKarateBridge\n(High-speed In-Memory Java Interop)"]
+            HttpStep["execute-http.feature\n(Header Inheritance, Retry Policy, Assertions)"]
+            DbStep["execute-db.feature\n(HikariCP: Postgres, Oracle JDBC, H2)"]
+            KafkaStep["execute-kafka.feature\n(Topic Consumer & Payload Assertions)"]
+            DelayStep["execute-delay.feature\n(Async Worker Pauses)"]
+            TransformStep["execute-transform.feature\n(JavaScript Runtime: HMAC, Date Math, Reshape)"]
         end
 
         EventBroadcaster["ExecutionLogBroadcaster\n(WebSocket STOMP + SSE Emitters)"]
     end
 
-    subgraph Storage["Persistence & Reports"]
-        Postgres[(PostgreSQL 16\nJSONB Schema + GIN Indexes)]
-        KarateReports["Isolated Karate Reports\n(/target/karate-reports/{executionId}/)"]
+    subgraph Storage["Persistence & Storage Layer"]
+        Postgres[(PostgreSQL 16\nJSONB Workflows & Executions)]
+        ReportDisk["Karate HTML Reports\n(/app/reports/{executionId}/)"]
     end
 
     CatalogUI -->|Drag & Drop Endpoints| Canvas
-    VarDrawer -->|Maps Step N Output to Step N+1 Input| Canvas
+    AutoLayout -.->|Calculates Coordinates| Canvas
+    ThemeEngine -.->|Applies Theme| Canvas
     Canvas -->|Saves AST & Visual State| API
-    Console -->|Streams Real-time Events & Logs| API
+    Console -->|Streams Real-time Logs & Abort Signal| API
+    Modals -->|Export/Import & Cleanup| API
     
     API --> OpenAPISvc
     API --> VirtualThreads
-    VirtualThreads --> MasterFeature
-    MasterFeature --> Bridge
+    API --> RetentionSvc
+    VirtualThreads --> Runner
+    Runner --> Bridge
+    Bridge --> HttpStep
+    Bridge --> DbStep
+    Bridge --> KafkaStep
+    Bridge --> DelayStep
+    Bridge --> TransformStep
     Bridge --> ContextEng
-    Bridge --> HikariHelper
-    Bridge --> KafkaHelper
     Bridge --> EventBroadcaster
     EventBroadcaster -.->|SSE & WebSockets| Console
-    MasterFeature --> KarateReports
+    Runner --> ReportDisk
+    RetentionSvc -->|Prunes Old Files| ReportDisk
     API --> Postgres
 ```
 
@@ -59,50 +79,89 @@ flowchart TD
 
 ## ✨ Key Technical Capabilities
 
-### 1. In-Memory Dynamic Karate Execution Bridge
-Unlike naive test runners that generate temporary `.feature` text files on disk for every test execution, **MeterFlow** employs a pre-compiled, generic master Karate suite:
-- `generic-flow-executor.feature`: Receives the dynamic workflow JSON payload in memory, executes steps in topological sequence, and feeds extracted outputs back into the global context.
-- `execute-step.feature`: Routes dynamically to specialized sub-features:
-  - `execute-http.feature`: Native Karate HTTP client executing dynamic URLs, methods, headers, and request bodies with automatic status and schema validation.
-  - `execute-db.feature`: Polls SQL databases through dynamic HikariCP connection pools until conditions evaluate to true (e.g. `row.status == 'COMPLETED'`) or timeouts expire.
-  - `execute-kafka.feature`: Consumes and asserts message payloads from Kafka topics within specified timeouts.
-  - `execute-delay.feature`: Pauses execution for asynchronous worker processing.
-- **Official Karate HTML/JSON Reports**: Produces isolated, per-run Karate HTML reports containing full HTTP traces, timings, request/response headers, curl commands, and Gherkin step logs.
+### 1. In-Memory Dynamic Karate 2.1.4 Execution Engine
+- **No Temporary Files for Test Logic**: Employs a workflow-attributed feature generator that binds execution state in memory via `DynamicKarateBridge`.
+- **Concurrency Locking**: Utilizes Karate scenario-level synchronization (`@lock=workflow-execution`) preventing race conditions during parallel runs.
+- **Dynamic Branch Execution**:
+  - `execute-http.feature`: Native Karate HTTP client executing dynamic URLs, verbs, headers, and payloads with JSONPath validation and retry polling.
+  - `execute-db.feature`: Polls SQL databases through dynamic HikariCP connection pools for **PostgreSQL**, **Oracle DB (`ojdbc17`)**, and **H2** until expectations match or timeout expires.
+  - `execute-kafka.feature`: Consumes Kafka topic events and verifies JSON schema within configured timeouts.
+  - `execute-delay.feature`: Non-blocking virtual thread pauses for asynchronous event queues.
+  - `execute-transform.feature`: Executes custom JavaScript expressions for HMAC tokens, UUIDs, date math, and context shaping.
+- **Executive HTML Reports**: Produces isolated, searchable Karate HTML reports with full request/response bodies, cURL commands, and step profiling.
 
-### 2. High-Performance Java 21 Virtual Threads
-- All workflow executions are offloaded to **Java 21 Virtual Threads** (`Executors.newVirtualThreadPerTaskExecutor()`).
-- Enables running hundreds of concurrent end-to-end integration test suites without thread exhaustion or OS context-switching overhead.
-- Returns `HTTP 202 Accepted` immediately upon execution trigger.
+### 2. High-Performance Java 25 Virtual Threads & Execution Control
+- Every test suite executes on lightweight **Java 25 Virtual Threads** (`Executors.newVirtualThreadPerTaskExecutor()`).
+- Immediate `HTTP 202 Accepted` asynchronous execution response.
+- **Mid-Flight Execution Abort / Cancellation**: Real-time cancellation via `POST /api/v1/executions/{id}/cancel` that safely interrupts the virtual thread, stops downstream steps, marks the execution status as `CANCELLED`, and broadcasts a WebSocket notification.
 
-### 3. OpenApiCatalogService with Intelligent Sample Payloads
-- Ingests OpenAPI 3.0/3.1 and Swagger 2.0 specifications via URL or raw YAML/JSON.
-- Recursively parses component schemas and `$ref` references.
-- Auto-generates clean, realistic sample request payloads based on field heuristics (e.g. email, UUID, date-time, integer, boolean).
-- Allows dragging any catalog endpoint directly onto the canvas to create pre-configured HTTP request nodes.
+### 3. JavaScript Data Transform Node
+- Dedicated violet visual node on the canvas.
+- Allows authoring custom JS transformation functions:
+  ```javascript
+  function(ctx) {
+    return {
+      authToken: 'Bearer ' + ctx.rawToken,
+      signature: 'HMAC_' + Math.random().toString(36).substring(7),
+      epochTimestamp: Date.now()
+    };
+  }
+  ```
+- Evaluated within Karate's JS runtime; returned map properties are dynamically merged into the global workflow execution context.
 
-### 4. WorkflowContextEngine & Runtime Variable Chaining
-- Resolves placeholders across steps using `${stepId.varName}` or direct JSONPath expressions:
-  - `${step_auth.token}` $\rightarrow$ Extracted from previous step.
-  - `${step_auth.response.body.user.id}` $\rightarrow$ Deep navigation.
-  - `${$timestamp}` $\rightarrow$ Current epoch millis.
-  - `${$isoTimestamp}` $\rightarrow$ ISO-8601 UTC date/time.
-  - `${$randomUuid}` $\rightarrow$ Random UUID v4.
-  - `${$randomInt(min, max)}` $\rightarrow$ Random integer in range.
-  - `${$randomString(length)}` $\rightarrow$ Random alphanumeric string.
-- Evaluates JSONPath queries via **Jayway JsonPath** with graceful null-safety.
+### 4. Step Enable / Disable (Muting) & Step Retry Policy
+- **Step Muting**: Toggle any step active or disabled directly from the configuration drawer. Muted steps are visually dimmed (`opacity-60`) with an amber `[Muted]` pill badge and cleanly skipped during test execution without deleting configurations.
+- **Step Retry Policy**: Configurable retry attempts (1 to 5) and retry intervals (ms) on HTTP steps. Automatically translates into native Karate retry polling:
+  ```gherkin
+  * configure retry = { count: 3, interval: 1000 }
+  * retry until responseStatus == 200
+  * method get
+  ```
 
-### 5. PostgreSQL JSONB Data Layer
-- `api_endpoint_catalog`: Stores endpoint metadata, tags, parameters, and generated sample payloads with GIN indexing.
-- `test_workflows`: Stores visual canvas state (nodes, edges, viewport) and compiled executable AST.
-- `workflow_executions`: Tracks asynchronous runs, status, context snapshots, per-step evaluations, and isolated report links.
+### 5. Portability: Standalone Karate Export, JSON Backup, & CI/CD Webhooks
+- **Karate `.feature` Export**: One-click download of a production-ready, standalone Karate Gherkin feature file (`/api/v1/workflows/{id}/export/feature`) that can be executed directly in CLI or CI pipelines.
+- **Workflow JSON Export/Import**: Export clean JSON workflow definitions or import/clone existing workflows from JSON backups.
+- **CI/CD Webhook Generator Modal**: Instant copy-pasteable cURL commands with environment selectors (`default`, `staging`, `production`) for GitHub Actions, GitLab CI, and Jenkins webhooks.
 
-### 6. Modern Visual Canvas & Live Execution Console
-- Built with **React 18**, **Tailwind CSS**, and **@xyflow/react** (React Flow 12).
-- Drag-and-drop nodes: HTTP Request, DB Poll, Kafka Assertion, and Delay.
-- Animated edges showing data flow.
-- Slide-over Node Configuration Drawer with integrated **Variable Selector Modal**.
-- Collapsible Live Execution Console streaming real-time Server-Sent Events (SSE) and WebSocket logs.
-- Embedded iframe viewer for the official Karate HTML report.
+### 6. Granular HTTP Header Inheritance & Environment Secrets
+- **Inheritance Modes per Step**:
+  - `INHERIT_ALL`: Automatically merges workflow global headers with step-specific headers (step headers take precedence on collision).
+  - `OVERRIDE_ALL`: Completely ignores workflow global headers and uses only the step's specific headers.
+  - `CUSTOM_ONLY`: Explicit custom header list for high-security isolation.
+- **Dynamic Secret Injection**: Reference host or container environment variables seamlessly: `${$env:API_KEY}`, `${$env:DATABASE_PASSWORD}`.
+
+### 7. Storage Reclamation & Automated Report Retention Pruning
+- **Automated Pruning**: Runs in the background upon workflow completion to keep only the latest $N$ executions per workflow (configured via `ORCHESTRATOR_RETENTION_MAX_RUNS_PER_WORKFLOW`, default: 3).
+- **Disk Space Reclamation**: Automatically purges orphaned Karate report directories and cleans up old database records.
+- **Storage Management Modal**: Inspect live disk usage statistics (`/api/v1/executions/storage-stats`) and perform one-click batch cleanups (`/api/v1/executions/cleanup`).
+
+### 8. Canvas Auto-Layout Engine (Topological Alignment)
+- Pure TypeScript implementation of **Kahn's Topological Sort Algorithm** (`layoutEngine.ts`).
+- One-click **"Auto Align"** button in the canvas toolbar that automatically computes hierarchical level assignments and spaces nodes cleanly without overlap.
+
+### 9. Modern React 19 Frontend & Theme Engine
+- Built with **React 19**, **Tailwind CSS**, and **@xyflow/react** (React Flow).
+- **Theme Mode Switcher**: Seamless switching between **Dark**, **Light**, and **System Default** modes with zero Flash of Unstyled Content (FOUC).
+- **Optimized Bundle Splitting**: Modal components are dynamically code-split with Vite, keeping production chunk sizes under 165 kB with build times under 1.7 seconds.
+
+---
+
+## 🐳 Ultra-Optimized Docker Architecture
+
+The backend Docker image is built for minimal size, fast cold starts, and production enterprise hardening:
+
+| Metric | Before Optimization | After Optimization | Improvement |
+| :--- | :--- | :--- | :--- |
+| **Final Image Size** | **336 MB** | **191 MB** | **-145 MB (~43% reduction)** |
+| **Java Runtime (JRE)** | 225 MB (`eclipse-temurin:25-jre-alpine`) | **55 MB** (Custom `jlink` JRE) | **-75% runtime footprint** |
+| **Base Linux OS** | Standard Alpine + Full JRE | **`alpine:3.21` (7 MB)** | **Minimal attack surface** |
+| **Rebuild Time (Code Changes)** | 1.5 – 3 minutes (re-packs 106MB jar) | **1.1 – 5.5 seconds** | **~95% faster builds** |
+| **Registry Push Delta** | 106 MB on every commit | **~1.5 MB** (Application layer only) | **~98% less network transfer** |
+| **Container Startup Time** | ~4.2 seconds (fat JAR unzipping) | **~3.1 – 4.0 seconds** (Unpacked `JarLauncher`) | **Faster cold starts** |
+| **Shutdown Latency** | Often hits 10s `SIGKILL` | **0.510 seconds** (`exec java` signal forwarding) | **Instant graceful shutdown** |
+| **Garbage Collection** | Default GC with warning | **Generational ZGC (`-XX:+UseZGC`)** | **Sub-millisecond pause times** |
+| **Health Monitoring** | None (Blind container) | **`/actuator/health` probe** | **Native Docker `(healthy)` status** |
+| **Security Privilege** | Root / Insecure | **`appuser:appgroup` (UID 10001)** | **Non-root least privilege** |
 
 ---
 
@@ -110,7 +169,7 @@ Unlike naive test runners that generate temporary `.feature` text files on disk 
 
 ### Option A: Run with Docker Compose (Recommended)
 
-Clone the repository and spin up PostgreSQL, the Spring Boot backend, and the React frontend with a single command:
+Clone the repository and spin up PostgreSQL, the Spring Boot backend, and the React frontend:
 
 ```bash
 docker compose up --build -d
@@ -118,6 +177,7 @@ docker compose up --build -d
 
 - **Frontend UI**: [http://localhost:3000](http://localhost:3000)
 - **Backend API**: [http://localhost:8080](http://localhost:8080)
+- **Actuator Health**: [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
 - **Swagger UI**: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
 - **PostgreSQL**: `localhost:5432` (`user: postgres`, `password: postgres`, `db: e2e_orchestrator`)
 
@@ -126,10 +186,13 @@ docker compose up --build -d
 ### Option B: Run Locally from Source
 
 #### Prerequisites
-- **Java 21 LTS** (e.g. Temurin 21)
+- **Java 25 LTS** (e.g. Temurin 25 or SDKMAN: `sdk install java 25.0.3-tem`)
 - **Maven 3.9+**
 - **Node.js 20+** and **npm**
-- **PostgreSQL** running locally or via Docker (`docker run -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=e2e_orchestrator -d postgres:16-alpine`)
+- **PostgreSQL 16** running locally or via Docker:
+  ```bash
+  docker run -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=e2e_orchestrator -d postgres:16-alpine
+  ```
 
 #### 1. Start Backend
 ```bash
@@ -179,20 +242,53 @@ DOCKER_USERNAME=<your-dockerhub-username> TAG=latest docker compose -f docker-co
 
 ## 🧪 Running Tests
 
-The test suite includes full unit and integration tests executing Karate tests against the in-memory bridge:
+The test suite includes 23 automated tests covering the entire execution lifecycle, Karate bridge interop, and storage reclamation:
 
 ```bash
 cd backend
 mvn test
 ```
 
-Test coverage includes:
-- `WorkflowContextEngineTest`: Placeholder resolution, dynamic macros, and Jayway JSONPath evaluation.
+### Key Test Coverage
+- `WorkflowFeaturesAndPortabilityTest`: Standalone Karate `.feature` export, JSON export/import, mid-flight cancellation, JS transform node variable injection, step muting, and step retry configuration.
 - `DynamicKarateRunnerTest`: Multi-step end-to-end workflow execution with token extraction, variable chaining, status assertions, and HTML report generation.
+- `ExecutionCleanupAndStorageReclamationTest`: Automated report directory deletion, disk reclamation calculation, and batch execution purging.
+- `DbExecutorAndReportExclusionTest`: Multi-database query execution (PostgreSQL, Oracle DB, H2) and report exclusion flags.
+- `WorkflowContextEngineTest`: Macro evaluation (`${$timestamp}`, `${$randomUuid}`), `${$env:VAR}` resolution, and JSONPath extraction.
 
 ---
 
 ## 📡 REST API Reference
+
+### Workflow & Portability Endpoints
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/workflows` | List all visual test workflows |
+| `GET` | `/api/v1/workflows/{id}` | Fetch workflow canvas state and compiled AST |
+| `POST` | `/api/v1/workflows` | Create a new test workflow |
+| `PUT` | `/api/v1/workflows/{id}` | Update workflow canvas and recompile AST |
+| `DELETE` | `/api/v1/workflows/{id}` | Delete workflow and cascade delete all its executions |
+| `GET` | `/api/v1/workflows/{id}/export/feature` | Download standalone executable Karate `.feature` file |
+| `GET` | `/api/v1/workflows/{id}/export/json` | Download workflow definition as clean JSON |
+| `POST` | `/api/v1/workflows/import` | Import / clone workflow from JSON payload |
+
+### Execution & Control Endpoints
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/v1/workflows/{id}/execute` | Trigger async execution via Virtual Threads (returns 202 Accepted) |
+| `POST` | `/api/v1/executions/{id}/cancel` | Abort and cancel running virtual thread execution mid-flight |
+| `GET` | `/api/v1/executions` | List execution history with pagination and status filters |
+| `GET` | `/api/v1/executions/{id}` | Get execution status, context snapshot, and step results |
+| `GET` | `/api/v1/executions/{id}/stream` | Server-Sent Events (SSE) live execution log stream |
+| `GET` | `/api/v1/executions/{id}/report/**` | Serves isolated Karate HTML reports and static assets |
+| `GET` | `/api/v1/executions/storage-stats` | Get total executions, disk space used, and report storage stats |
+| `DELETE` | `/api/v1/executions/cleanup` | Delete old executions and reclaim disk space (`keepLastN` parameter) |
+
+### System & Health Endpoints
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/actuator/health` | Container liveness & readiness probes (Docker healthcheck) |
+| `GET` | `/actuator/info` | Application metadata and build info |
 
 ### Catalog Endpoints
 | Method | Endpoint | Description |
@@ -202,24 +298,6 @@ Test coverage includes:
 | `GET` | `/api/v1/catalog/endpoints` | Query endpoints with optional `serviceName` and `search` |
 | `GET` | `/api/v1/catalog/services` | List distinct microservices |
 | `DELETE` | `/api/v1/catalog/endpoints/{id}` | Delete an endpoint |
-
-### Workflow Endpoints
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/v1/workflows` | List all visual test workflows |
-| `GET` | `/api/v1/workflows/{id}` | Fetch workflow canvas state and compiled AST |
-| `POST` | `/api/v1/workflows` | Create a new test workflow |
-| `PUT` | `/api/v1/workflows/{id}` | Update workflow canvas and recompile AST |
-| `DELETE` | `/api/v1/workflows/{id}` | Delete a workflow |
-
-### Execution Endpoints
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/v1/workflows/{id}/execute` | Trigger async execution via Virtual Threads (returns 202) |
-| `GET` | `/api/v1/executions` | List execution history |
-| `GET` | `/api/v1/executions/{id}` | Get execution status, context snapshot, and step results |
-| `GET` | `/api/v1/executions/{id}/stream` | Server-Sent Events (SSE) live execution log stream |
-| `GET` | `/api/v1/executions/{id}/report/**` | Serves isolated Karate HTML reports and assets |
 
 ### Built-in Mock APIs (For Out-of-the-Box Testing)
 | Method | Endpoint | Description |

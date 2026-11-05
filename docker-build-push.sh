@@ -204,6 +204,16 @@ services:
       ORCHESTRATOR_REPORTS_PATH: /app/reports
     volumes:
       - reports_data:/app/reports
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
     depends_on:
       postgres:
         condition: service_healthy
@@ -217,7 +227,8 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - orchestrator-net
 
