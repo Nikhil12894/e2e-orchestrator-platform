@@ -10,7 +10,7 @@ public class DbPollStepConfig implements Serializable {
     private String query;
     private Long pollIntervalMs = 1000L;
     private Long timeoutMs = 15000L;
-    private Integer maxAttempts = 1;
+    private Integer maxAttempts = 5;
     private String condition; // e.g. "row.status == 'COMPLETED'" or "row_count > 0"
     private Integer expectedRowCount;
 

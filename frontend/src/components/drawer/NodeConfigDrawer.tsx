@@ -910,7 +910,7 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                         <label className="text-[11px] font-semibold text-slate-300">Poll & Retry Policy</label>
                       </div>
                       <span className="text-[10px] font-mono text-amber-500 font-semibold">
-                        {(data.maxAttempts ?? data.retryCount ?? 5)}x attempts • {data.pollIntervalMs ?? 1000}ms interval
+                        {(data.maxAttempts ?? data.retryCount ?? 1)}x attempts • {data.pollIntervalMs ?? 1000}ms interval
                       </span>
                     </div>
 
