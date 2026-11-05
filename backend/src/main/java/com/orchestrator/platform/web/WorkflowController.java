@@ -1,6 +1,8 @@
 package com.orchestrator.platform.web;
 
 import com.orchestrator.platform.domain.entity.TestWorkflowEntity;
+import com.orchestrator.platform.domain.model.dto.DbConnectionTestRequest;
+import com.orchestrator.platform.domain.model.dto.DbConnectionTestResult;
 import com.orchestrator.platform.domain.model.dto.WorkflowCreateRequest;
 import com.orchestrator.platform.service.TestWorkflowService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -96,5 +98,12 @@ public class WorkflowController {
     public ResponseEntity<TestWorkflowEntity> importWorkflow(@RequestBody WorkflowCreateRequest request) {
         TestWorkflowEntity imported = workflowService.importWorkflow(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(imported);
+    }
+
+    @PostMapping("/test-db")
+    @Operation(summary = "Test database connection", description = "Validates JDBC database connectivity, driver, credentials and optional query")
+    public ResponseEntity<DbConnectionTestResult> testDbConnection(@RequestBody DbConnectionTestRequest request) {
+        DbConnectionTestResult result = workflowService.testDbConnection(request);
+        return ResponseEntity.ok(result);
     }
 }

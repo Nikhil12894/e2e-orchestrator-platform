@@ -87,6 +87,31 @@ export const workflowApi = {
   exportJsonUrl: (id: string): string => {
     return `/api/v1/workflows/${id}/export/json`;
   },
+
+  testDbConnection: async (req: {
+    jdbcUrl: string;
+    username?: string;
+    password?: string;
+    driverClassName?: string;
+    query?: string;
+    environment?: string;
+    envProperties?: Record<string, any>;
+    envSecrets?: Record<string, string>;
+    secrets?: Record<string, string>;
+  }): Promise<{
+    success: boolean;
+    message: string;
+    databaseProductName?: string;
+    databaseProductVersion?: string;
+    driverName?: string;
+    driverVersion?: string;
+    latencyMs?: number;
+    sampleRow?: Record<string, any>;
+    errorMessage?: string;
+  }> => {
+    const resp = await api.post('/workflows/test-db', req);
+    return resp.data;
+  },
 };
 
 export const executionApi = {

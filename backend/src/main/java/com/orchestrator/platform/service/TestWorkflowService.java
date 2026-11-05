@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.orchestrator.platform.config.HikariConnectionPoolManager;
 import com.orchestrator.platform.domain.entity.TestWorkflowEntity;
 import com.orchestrator.platform.domain.entity.WorkflowExecutionEntity;
 import com.orchestrator.platform.domain.enums.StepType;
@@ -33,6 +34,8 @@ import com.orchestrator.platform.domain.model.canvas.CanvasEdge;
 import com.orchestrator.platform.domain.model.canvas.CanvasNode;
 import com.orchestrator.platform.domain.model.canvas.CanvasPosition;
 import com.orchestrator.platform.domain.model.canvas.CanvasState;
+import com.orchestrator.platform.domain.model.dto.DbConnectionTestRequest;
+import com.orchestrator.platform.domain.model.dto.DbConnectionTestResult;
 import com.orchestrator.platform.domain.model.dto.WorkflowCreateRequest;
 import com.orchestrator.platform.repository.TestWorkflowRepository;
 import com.orchestrator.platform.repository.WorkflowExecutionRepository;
@@ -49,15 +52,56 @@ public class TestWorkflowService {
     private final WorkflowExecutionRepository executionRepository;
     private final DynamicKarateRunner karateRunner;
     private final ObjectMapper objectMapper;
+    private final HikariConnectionPoolManager connectionPoolManager;
+    private final WorkflowContextEngine contextEngine;
 
     public TestWorkflowService(TestWorkflowRepository workflowRepository,
                                WorkflowExecutionRepository executionRepository,
                                DynamicKarateRunner karateRunner,
-                               ObjectMapper objectMapper) {
+                               ObjectMapper objectMapper,
+                               HikariConnectionPoolManager connectionPoolManager,
+                               WorkflowContextEngine contextEngine) {
         this.workflowRepository = workflowRepository;
         this.executionRepository = executionRepository;
         this.karateRunner = karateRunner;
         this.objectMapper = objectMapper;
+        this.connectionPoolManager = connectionPoolManager;
+        this.contextEngine = contextEngine;
+    }
+
+    public DbConnectionTestResult testDbConnection(DbConnectionTestRequest request) {
+        Map<String, Object> ctx = new HashMap<>();
+        if (request.getEnvProperties() != null) {
+            ctx.putAll(request.getEnvProperties());
+        }
+        if (request.getEnvSecrets() != null) {
+            ctx.putAll(request.getEnvSecrets());
+        }
+        if (request.getSecrets() != null) {
+            ctx.putAll(request.getSecrets());
+        }
+
+        String url = request.getJdbcUrl();
+        if (url != null && url.contains("${")) {
+            url = contextEngine.resolveString(url, ctx);
+        }
+
+        String username = request.getUsername();
+        if (username != null && username.contains("${")) {
+            username = contextEngine.resolveString(username, ctx);
+        }
+
+        String password = request.getPassword();
+        if (password != null && password.contains("${")) {
+            password = contextEngine.resolveString(password, ctx);
+        }
+
+        String query = request.getQuery();
+        if (query != null && query.contains("${")) {
+            query = contextEngine.resolveString(query, ctx);
+        }
+
+        return connectionPoolManager.testConnection(url, username, password, request.getDriverClassName(), query);
     }
 
     @Transactional(readOnly = true)

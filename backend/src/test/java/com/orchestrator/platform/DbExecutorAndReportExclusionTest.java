@@ -7,6 +7,7 @@ import com.orchestrator.platform.domain.entity.WorkflowExecutionEntity;
 import com.orchestrator.platform.domain.enums.ExecutionStatus;
 import com.orchestrator.platform.domain.enums.StepType;
 import com.orchestrator.platform.domain.model.ast.DbPollStepConfig;
+import com.orchestrator.platform.domain.model.dto.DbConnectionTestResult;
 import com.orchestrator.platform.domain.model.dto.ExecutionStepResult;
 import com.orchestrator.platform.service.execution.DbPollExecutor;
 import com.orchestrator.platform.service.execution.DynamicKarateBridge;
@@ -243,5 +244,90 @@ public class DbExecutorAndReportExclusionTest {
         assertEquals(1, result.getAttempts(), "Single attempt must execute");
         assertNotNull(result.getLatestRow());
         assertEquals(42, ((Number) result.getLatestRow().get("ANSWER")).intValue());
+    }
+
+    @Test
+    @DisplayName("Verify SQL value normalization converts Timestamps and Blobs to JSON-safe primitives")
+    public void testNormalizeSqlValuesWithTimestampsAndBlobs() throws Exception {
+        // 1. Timestamp to ISO String
+        java.sql.Timestamp ts = java.sql.Timestamp.valueOf("2026-11-05 16:40:52.123");
+        Object normTs = HikariConnectionPoolManager.normalizeSqlValue(ts);
+        assertTrue(normTs instanceof String);
+        assertTrue(((String) normTs).contains("2026-11-05T"));
+
+        // 2. Date to ISO Date String
+        java.sql.Date d = java.sql.Date.valueOf("2026-11-05");
+        assertEquals("2026-11-05", HikariConnectionPoolManager.normalizeSqlValue(d));
+
+        // 3. Time to LocalTime String
+        java.sql.Time t = java.sql.Time.valueOf("16:40:52");
+        assertEquals("16:40:52", HikariConnectionPoolManager.normalizeSqlValue(t));
+
+        // 4. byte[] to Base64 String
+        byte[] bytes = "Hello Oracle".getBytes();
+        Object normBytes = HikariConnectionPoolManager.normalizeSqlValue(bytes);
+        assertEquals(Base64.getEncoder().encodeToString(bytes), normBytes);
+
+        // 5. Test Jackson serializability of normalized map
+        Map<String, Object> testRow = new HashMap<>();
+        testRow.put("ID", 101);
+        testRow.put("CREATED_TIME", normTs);
+        testRow.put("PAYLOAD", normBytes);
+
+        ObjectMapper mapper = new ObjectMapper();
+        String json = mapper.writeValueAsString(testRow);
+        assertNotNull(json);
+        assertTrue(json.contains("CREATED_TIME"));
+        assertTrue(json.contains("2026-11-05T"));
+    }
+
+    @Test
+    @DisplayName("Verify testConnection successfully connects to database and queries sample row")
+    public void testTestDbConnectionSuccess() {
+        HikariConnectionPoolManager poolManager = new HikariConnectionPoolManager();
+
+        DbConnectionTestResult res = poolManager.testConnection(
+                "jdbc:h2:mem:testconn_success;DB_CLOSE_DELAY=-1",
+                "sa",
+                "",
+                "org.h2.Driver",
+                "SELECT 999 AS code, 'ONLINE' AS health"
+        );
+
+        assertTrue(res.isSuccess(), "Connection should succeed");
+        assertEquals("H2", res.getDatabaseProductName());
+        assertNotNull(res.getLatencyMs());
+        assertTrue(res.getLatencyMs() >= 0);
+        assertNotNull(res.getSampleRow());
+        assertEquals(999, ((Number) res.getSampleRow().get("CODE")).intValue());
+        assertEquals("ONLINE", res.getSampleRow().get("HEALTH"));
+    }
+
+    @Test
+    @DisplayName("Verify testConnection fails gracefully on invalid credentials without throwing unhandled exceptions")
+    public void testTestDbConnectionInvalidUrl() {
+        HikariConnectionPoolManager poolManager = new HikariConnectionPoolManager();
+
+        // Initialize a secure database with credentials
+        poolManager.testConnection(
+                "jdbc:h2:mem:auth_test_db;USER=admin;PASSWORD=secret;DB_CLOSE_DELAY=-1",
+                "admin",
+                "secret",
+                "org.h2.Driver",
+                "SELECT 1"
+        );
+
+        // Attempt connection with invalid password
+        DbConnectionTestResult res = poolManager.testConnection(
+                "jdbc:h2:mem:auth_test_db;DB_CLOSE_DELAY=-1",
+                "admin",
+                "wrong_password",
+                "org.h2.Driver",
+                null
+        );
+
+        assertFalse(res.isSuccess(), "Connection with wrong password should fail");
+        assertNotNull(res.getErrorMessage());
+        assertTrue(res.getErrorMessage().length() > 0);
     }
 }

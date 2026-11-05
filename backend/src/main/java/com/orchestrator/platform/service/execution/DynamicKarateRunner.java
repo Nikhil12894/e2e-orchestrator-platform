@@ -198,7 +198,7 @@ public class DynamicKarateRunner {
         }
         finalExecution.setDurationMs(durationMs);
         finalExecution.setEndTime(Instant.ofEpochMilli(endTime));
-        finalExecution.setContextSnapshot(finalContext);
+        finalExecution.setContextSnapshot(sanitizeContextSnapshot(finalContext));
         finalExecution.setStepResults(stepResults);
 
         // Generate Executive Workflow Profiling & Performance Report
@@ -218,7 +218,21 @@ public class DynamicKarateRunner {
             }
         }
 
-        WorkflowExecutionEntity saved = executionRepository.saveAndFlush(finalExecution);
+        WorkflowExecutionEntity saved;
+        try {
+            saved = executionRepository.saveAndFlush(finalExecution);
+        } catch (Exception e) {
+            log.error("Failed to save execution entity with contextSnapshot: {}. Retrying with stringified context...", e.getMessage());
+            Map<String, Object> fallbackContext = new HashMap<>();
+            if (finalExecution.getContextSnapshot() != null) {
+                for (Map.Entry<String, Object> entry : finalExecution.getContextSnapshot().entrySet()) {
+                    fallbackContext.put(entry.getKey(), String.valueOf(entry.getValue()));
+                }
+            }
+            finalExecution.setContextSnapshot(fallbackContext);
+            saved = executionRepository.saveAndFlush(finalExecution);
+        }
+
         DynamicKarateBridge.cleanupExecution(executionId.toString());
 
         // Broadcast final execution finished event
@@ -372,5 +386,44 @@ Feature: Workflow: %s (v%d) [Env: %s]
     * def results = karate.forEach(steps, runStep)
     * eval Bridge.onWorkflowComplete(executionId, globalContext)
 """.formatted(cleanName, version, envStr, cleanName);
+    }
+
+    private Map<String, Object> sanitizeContextSnapshot(Map<String, Object> context) {
+        if (context == null) return Collections.emptyMap();
+        Map<String, Object> sanitized = new ConcurrentHashMap<>();
+        for (Map.Entry<String, Object> entry : context.entrySet()) {
+            if (entry.getKey() == null) continue;
+            sanitized.put(entry.getKey(), sanitizeValue(entry.getValue()));
+        }
+        return sanitized;
+    }
+
+    private Object sanitizeValue(Object val) {
+        if (val == null) return null;
+        if (val instanceof String || val instanceof Number || val instanceof Boolean) {
+            return val;
+        }
+        if (val instanceof Map<?, ?> map) {
+            Map<String, Object> safeMap = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> e : map.entrySet()) {
+                if (e.getKey() != null) {
+                    safeMap.put(String.valueOf(e.getKey()), sanitizeValue(e.getValue()));
+                }
+            }
+            return safeMap;
+        }
+        if (val instanceof Collection<?> coll) {
+            List<Object> safeList = new ArrayList<>(coll.size());
+            for (Object item : coll) {
+                safeList.add(sanitizeValue(item));
+            }
+            return safeList;
+        }
+        try {
+            objectMapper.writeValueAsString(val);
+            return val;
+        } catch (Exception e) {
+            return String.valueOf(val);
+        }
     }
 }
