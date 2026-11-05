@@ -35,6 +35,7 @@ public class DynamicKarateBridge {
     private static final Map<String, Map<String, Object>> activeContexts = new ConcurrentHashMap<>();
     private static final Map<String, List<ExecutionStepResult>> activeStepResults = new ConcurrentHashMap<>();
     private static final Map<String, Long> stepStartTimes = new ConcurrentHashMap<>();
+    private static final Set<String> cancelledExecutions = ConcurrentHashMap.newKeySet();
 
     public DynamicKarateBridge(WorkflowContextEngine contextEngine,
                                DbPollExecutor dbPollExecutor,
@@ -76,8 +77,60 @@ public class DynamicKarateBridge {
         return activeStepResults.getOrDefault(executionId, Collections.emptyList());
     }
 
+    public static void markCancelled(String executionId) {
+        if (executionId != null) {
+            cancelledExecutions.add(executionId);
+        }
+    }
+
+    public static boolean isExecutionCancelled(String executionId) {
+        if (executionId != null && cancelledExecutions.contains(executionId)) {
+            return true;
+        }
+        return false;
+    }
+
+    public static Map<String, Object> executeDelay(String executionId, Object pauseMsObj) {
+        long pauseMs = 1000L;
+        if (pauseMsObj instanceof Number num) {
+            pauseMs = num.longValue();
+        } else if (pauseMsObj != null) {
+            try {
+                pauseMs = Long.parseLong(String.valueOf(pauseMsObj).trim());
+            } catch (Exception ignored) {}
+        }
+
+        if (isExecutionCancelled(executionId)) {
+            Thread.interrupted();
+            return Map.of("interrupted", true, "completed", false);
+        }
+
+        try {
+            long remaining = pauseMs;
+            long slice = 50L;
+            while (remaining > 0) {
+                if (isExecutionCancelled(executionId)) {
+                    Thread.interrupted();
+                    return Map.of("interrupted", true, "completed", false);
+                }
+                long sleepTime = Math.min(remaining, slice);
+                Thread.sleep(sleepTime);
+                remaining -= sleepTime;
+            }
+            return Map.of("interrupted", false, "completed", true);
+        } catch (InterruptedException e) {
+            // Clear interrupt status so Karate scenario does not crash with unhandled exception
+            Thread.interrupted();
+            log.info("Delay step interrupted for execution [{}] (cancelled by user)", executionId);
+            return Map.of("interrupted", true, "completed", false);
+        }
+    }
+
     public static void cleanupExecution(String executionId) {
-        // Keeps results around for inspection, but can remove transient context
+        if (executionId != null) {
+            cancelledExecutions.remove(executionId);
+            stepStartTimes.remove(executionId);
+        }
     }
 
     public static void onWorkflowStart(String executionId, String workflowId, int totalSteps) {

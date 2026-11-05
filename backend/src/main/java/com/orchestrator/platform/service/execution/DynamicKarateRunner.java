@@ -193,7 +193,9 @@ public class DynamicKarateRunner {
         }
 
         WorkflowExecutionEntity finalExecution = executionRepository.findById(executionId).orElse(currentExecution);
-        finalExecution.setStatus(failed ? ExecutionStatus.FAILED : ExecutionStatus.COMPLETED);
+        if (finalExecution.getStatus() != ExecutionStatus.CANCELLED) {
+            finalExecution.setStatus(failed ? ExecutionStatus.FAILED : ExecutionStatus.COMPLETED);
+        }
         finalExecution.setDurationMs(durationMs);
         finalExecution.setEndTime(Instant.ofEpochMilli(endTime));
         finalExecution.setContextSnapshot(finalContext);
@@ -207,11 +209,13 @@ public class DynamicKarateRunner {
             finalExecution.setReportPath("/api/v1/executions/" + executionId + "/report/karate-summary.html");
         }
 
-        if (karateResults != null && karateResults.getErrors() != null && !karateResults.getErrors().isEmpty()) {
-            String rawErrors = String.join("\n", karateResults.getErrors());
-            finalExecution.setErrorMessage(logBroadcaster.maskSecrets(executionId, rawErrors));
-        } else if (finalExecution.getErrorMessage() != null) {
-            finalExecution.setErrorMessage(logBroadcaster.maskSecrets(executionId, finalExecution.getErrorMessage()));
+        if (finalExecution.getStatus() != ExecutionStatus.CANCELLED) {
+            if (karateResults != null && karateResults.getErrors() != null && !karateResults.getErrors().isEmpty()) {
+                String rawErrors = String.join("\n", karateResults.getErrors());
+                finalExecution.setErrorMessage(logBroadcaster.maskSecrets(executionId, rawErrors));
+            } else if (finalExecution.getErrorMessage() != null) {
+                finalExecution.setErrorMessage(logBroadcaster.maskSecrets(executionId, finalExecution.getErrorMessage()));
+            }
         }
 
         WorkflowExecutionEntity saved = executionRepository.saveAndFlush(finalExecution);

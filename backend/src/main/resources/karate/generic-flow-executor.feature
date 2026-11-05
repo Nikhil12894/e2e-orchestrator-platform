@@ -17,6 +17,10 @@ Feature: Generic Dynamic Workflow Orchestrator
     * def runStep =
       """
       function(stepItem, idx) {
+        if (Bridge.isExecutionCancelled(executionId)) {
+          karate.log('Workflow execution is cancelled; aborting remaining step:', stepItem.id);
+          return { cancelled: true };
+        }
         if (!stepItem.enabled && stepItem.enabled !== undefined) {
           karate.log('Skipping disabled step:', stepItem.id);
           return { skipped: true };

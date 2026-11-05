@@ -7,6 +7,7 @@ import com.orchestrator.platform.domain.model.dto.ExecutionEventDto;
 import com.orchestrator.platform.domain.model.dto.WorkflowExecutionRequest;
 import com.orchestrator.platform.repository.TestWorkflowRepository;
 import com.orchestrator.platform.repository.WorkflowExecutionRepository;
+import com.orchestrator.platform.service.execution.DynamicKarateBridge;
 import com.orchestrator.platform.service.execution.DynamicKarateRunner;
 import com.orchestrator.platform.service.execution.ExecutionLogBroadcaster;
 import org.slf4j.Logger;
@@ -97,6 +98,7 @@ public class TestWorkflowExecutionService {
     @Transactional
     public WorkflowExecutionEntity cancelExecution(UUID executionId) {
         log.info("Cancelling execution [id={}]", executionId);
+        DynamicKarateBridge.markCancelled(executionId.toString());
         Future<?> task = runningTasks.remove(executionId);
         if (task != null) {
             task.cancel(true);

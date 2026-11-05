@@ -6,6 +6,7 @@ Feature: Execute Delay Step
     * def pauseMs = resolvedStep.delayMs || 1000
 
   Scenario: Run Delay
-    * eval karate.pause(pauseMs)
-    * eval Bridge.onStepFinished(executionId, resolvedStep, true, 200, { delayMs: pauseMs }, { status: 'COMPLETE' }, {}, [], null)
+    * def delayRes = Bridge.executeDelay(executionId, pauseMs)
+    * def isCancelled = delayRes.interrupted || false
+    * eval Bridge.onStepFinished(executionId, resolvedStep, !isCancelled, 200, { delayMs: pauseMs }, { status: isCancelled ? 'CANCELLED' : 'COMPLETE' }, {}, [], isCancelled ? 'Step cancelled by user' : null)
 
