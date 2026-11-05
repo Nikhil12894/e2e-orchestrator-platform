@@ -66,6 +66,7 @@ export interface DbPollStepConfig {
   query: string;
   pollIntervalMs?: number;
   timeoutMs?: number;
+  maxAttempts?: number;
   condition?: string;
   expectedRowCount?: number;
 }
@@ -135,6 +136,8 @@ export interface CanvasNodeData {
   expectedValue?: string;
   delayMs?: number;
   script?: string;
+  maxAttempts?: number;
+  pollIntervalMs?: number;
   retryCount?: number;
   retryIntervalMs?: number;
   enabled?: boolean;

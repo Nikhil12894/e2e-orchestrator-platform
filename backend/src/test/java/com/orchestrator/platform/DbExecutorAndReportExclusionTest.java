@@ -6,7 +6,9 @@ import com.orchestrator.platform.domain.entity.TestWorkflowEntity;
 import com.orchestrator.platform.domain.entity.WorkflowExecutionEntity;
 import com.orchestrator.platform.domain.enums.ExecutionStatus;
 import com.orchestrator.platform.domain.enums.StepType;
+import com.orchestrator.platform.domain.model.ast.DbPollStepConfig;
 import com.orchestrator.platform.domain.model.dto.ExecutionStepResult;
+import com.orchestrator.platform.service.execution.DbPollExecutor;
 import com.orchestrator.platform.service.execution.DynamicKarateBridge;
 import com.orchestrator.platform.service.execution.WorkflowReportGenerator;
 import org.junit.jupiter.api.DisplayName;
@@ -190,5 +192,56 @@ public class DbExecutorAndReportExclusionTest {
         assertEquals("Bearer custom-admin-jwt", effective4.get("Authorization"), "Step header must override global header");
         assertEquals("application/json", effective4.get("Content-Type"));
         assertEquals("tenant-alpha", effective4.get("X-Tenant-Id"));
+    }
+
+    @Test
+    @DisplayName("Verify DB Poll halts after maxAttempts when condition is not satisfied")
+    public void testDbPollMaxAttemptsEnforced() {
+        HikariConnectionPoolManager poolManager = new HikariConnectionPoolManager();
+        DbPollExecutor executor = new DbPollExecutor(poolManager);
+
+        DbPollStepConfig config = new DbPollStepConfig();
+        config.setJdbcUrl("jdbc:h2:mem:polltest_max_attempts;DB_CLOSE_DELAY=-1");
+        config.setUsername("sa");
+        config.setPassword("");
+        config.setDriverClassName("org.h2.Driver");
+        config.setQuery("SELECT 1 AS num");
+        config.setCondition("row.num == '999'"); // Unsatisfiable
+        config.setMaxAttempts(3);
+        config.setPollIntervalMs(50L);
+        config.setTimeoutMs(30000L); // High timeout to ensure attempt limit triggers first
+
+        DbPollExecutor.DbPollResult result = executor.execute(config);
+
+        assertFalse(result.isMatched(), "Condition should not match");
+        assertEquals(3, result.getAttempts(), "Attempts must equal maxAttempts (3)");
+        assertNotNull(result.getErrorMessage());
+        assertTrue(result.getErrorMessage().contains("reached maximum retry attempts (3/3)"),
+                "Error message must specify reached maximum retry attempts: " + result.getErrorMessage());
+    }
+
+    @Test
+    @DisplayName("Verify DB Poll single-shot execution with maxAttempts=1 (no retries)")
+    public void testDbPollSingleAttemptNoRetry() {
+        HikariConnectionPoolManager poolManager = new HikariConnectionPoolManager();
+        DbPollExecutor executor = new DbPollExecutor(poolManager);
+
+        DbPollStepConfig config = new DbPollStepConfig();
+        config.setJdbcUrl("jdbc:h2:mem:polltest_single_attempt;DB_CLOSE_DELAY=-1");
+        config.setUsername("sa");
+        config.setPassword("");
+        config.setDriverClassName("org.h2.Driver");
+        config.setQuery("SELECT 42 AS answer");
+        config.setCondition("row.answer == '42'");
+        config.setMaxAttempts(1);
+        config.setPollIntervalMs(500L);
+        config.setTimeoutMs(10000L);
+
+        DbPollExecutor.DbPollResult result = executor.execute(config);
+
+        assertTrue(result.isMatched(), "Condition should match immediately");
+        assertEquals(1, result.getAttempts(), "Single attempt must execute");
+        assertNotNull(result.getLatestRow());
+        assertEquals(42, ((Number) result.getLatestRow().get("ANSWER")).intValue());
     }
 }

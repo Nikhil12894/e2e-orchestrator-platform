@@ -235,6 +235,8 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
                   jdbcUrl: 'jdbc:postgresql://localhost:5432/e2e_orchestrator',
                   query: "SELECT status FROM orders WHERE id = '${orderId}'",
                   condition: "row.status == 'COMPLETED'",
+                  maxAttempts: 5,
+                  pollIntervalMs: 1000,
                   timeoutMs: 15000,
                 })
               }

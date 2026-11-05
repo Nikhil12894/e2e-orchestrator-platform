@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import { Database, CheckCircle2, XCircle, Clock, EyeOff } from 'lucide-react';
+import { Database, CheckCircle2, XCircle, Clock, EyeOff, RotateCcw } from 'lucide-react';
 import { CanvasNodeData } from '../../../types/workflow';
 
 export const DbPollNode = memo(({ data, selected }: NodeProps<any>) => {
@@ -61,12 +61,20 @@ export const DbPollNode = memo(({ data, selected }: NodeProps<any>) => {
 
       {/* Footer Details: Condition & Duration */}
       <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800/60">
-        <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-300/90 border border-amber-500/20 font-mono truncate max-w-[170px]">
-          {nodeData.condition || 'count > 0'}
-        </span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-300/90 border border-amber-500/20 font-mono truncate max-w-[120px]" title={nodeData.condition}>
+            {nodeData.condition || 'count > 0'}
+          </span>
+          {(nodeData.maxAttempts || nodeData.retryCount) && (
+            <span className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[9px] font-mono shrink-0">
+              <RotateCcw className="w-2.5 h-2.5" />
+              {nodeData.maxAttempts || nodeData.retryCount}x
+            </span>
+          )}
+        </div>
 
         {nodeData.durationMs !== undefined && (
-          <span className="flex items-center gap-1 font-mono text-slate-400 dark:text-slate-500">
+          <span className="flex items-center gap-1 font-mono text-slate-400 dark:text-slate-500 shrink-0">
             <Clock className="w-2.5 h-2.5" />
             {nodeData.durationMs}ms
           </span>

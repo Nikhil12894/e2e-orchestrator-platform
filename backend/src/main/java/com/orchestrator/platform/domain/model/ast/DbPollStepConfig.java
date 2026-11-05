@@ -10,6 +10,7 @@ public class DbPollStepConfig implements Serializable {
     private String query;
     private Long pollIntervalMs = 1000L;
     private Long timeoutMs = 15000L;
+    private Integer maxAttempts = 1;
     private String condition; // e.g. "row.status == 'COMPLETED'" or "row_count > 0"
     private Integer expectedRowCount;
 
@@ -35,6 +36,9 @@ public class DbPollStepConfig implements Serializable {
 
     public Long getTimeoutMs() { return timeoutMs; }
     public void setTimeoutMs(Long timeoutMs) { this.timeoutMs = timeoutMs; }
+
+    public Integer getMaxAttempts() { return maxAttempts; }
+    public void setMaxAttempts(Integer maxAttempts) { this.maxAttempts = maxAttempts; }
 
     public String getCondition() { return condition; }
     public void setCondition(String condition) { this.condition = condition; }

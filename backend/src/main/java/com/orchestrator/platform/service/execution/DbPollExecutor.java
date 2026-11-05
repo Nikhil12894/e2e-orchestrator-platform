@@ -51,9 +51,10 @@ public class DbPollExecutor {
         long startTime = System.currentTimeMillis();
         long timeoutMs = config.getTimeoutMs() != null ? config.getTimeoutMs() : 15000L;
         long intervalMs = config.getPollIntervalMs() != null ? config.getPollIntervalMs() : 1000L;
+        int maxAttempts = config.getMaxAttempts() != null && config.getMaxAttempts() > 0 ? config.getMaxAttempts() : 5;
 
         int attempts = 0;
-        while ((System.currentTimeMillis() - startTime) < timeoutMs) {
+        while ((System.currentTimeMillis() - startTime) < timeoutMs && attempts < maxAttempts) {
             attempts++;
             try {
                 List<Map<String, Object>> rows = connectionPoolManager.executeQuery(
@@ -82,8 +83,22 @@ public class DbPollExecutor {
                 result.setErrorMessage(e.getMessage());
             }
 
+            // If we have reached maxAttempts or timeout, do not sleep
+            if (attempts >= maxAttempts || (System.currentTimeMillis() - startTime) >= timeoutMs) {
+                break;
+            }
+
             try {
-                Thread.sleep(intervalMs);
+                // Sliced sleep in 50ms intervals so thread interruptions wake up immediately
+                long remainingSleep = intervalMs;
+                while (remainingSleep > 0) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        throw new InterruptedException("Thread interrupted during DB poll wait");
+                    }
+                    long slice = Math.min(50L, remainingSleep);
+                    Thread.sleep(slice);
+                    remainingSleep -= slice;
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
@@ -93,8 +108,12 @@ public class DbPollExecutor {
         result.setMatched(false);
         result.setAttempts(attempts);
         result.setDurationMs(System.currentTimeMillis() - startTime);
-        if (result.getErrorMessage() == null) {
-            result.setErrorMessage("DB poll timed out after " + result.getDurationMs() + "ms. Condition was not satisfied.");
+        if (result.getErrorMessage() == null || result.getErrorMessage().isBlank()) {
+            if (attempts >= maxAttempts) {
+                result.setErrorMessage("DB poll failed: reached maximum retry attempts (" + attempts + "/" + maxAttempts + ") after " + result.getDurationMs() + "ms without condition matching.");
+            } else {
+                result.setErrorMessage("DB poll timed out after " + result.getDurationMs() + "ms (" + attempts + " attempts). Condition was not satisfied.");
+            }
         }
         return result;
     }

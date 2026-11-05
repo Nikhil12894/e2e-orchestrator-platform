@@ -901,6 +901,62 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                       className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500"
                     />
                   </div>
+
+                  {/* Poll & Retry Policy for DB Poll */}
+                  <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <RotateCcw className="w-3.5 h-3.5 text-amber-500" />
+                        <label className="text-[11px] font-semibold text-slate-300">Poll & Retry Policy</label>
+                      </div>
+                      <span className="text-[10px] font-mono text-amber-500 font-semibold">
+                        {(data.maxAttempts ?? data.retryCount ?? 5)}x attempts • {data.pollIntervalMs ?? 1000}ms interval
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 pt-1">
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1">Max Attempts</label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={data.maxAttempts ?? data.retryCount ?? 5}
+                          onChange={(e) => {
+                            const val = Math.max(1, Math.min(100, parseInt(e.target.value) || 1));
+                            update({ maxAttempts: val, retryCount: val });
+                          }}
+                          className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1">Interval (ms)</label>
+                        <input
+                          type="number"
+                          min="100"
+                          step="250"
+                          value={data.pollIntervalMs ?? 1000}
+                          onChange={(e) => update({ pollIntervalMs: Math.max(100, parseInt(e.target.value) || 1000) })}
+                          className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1">Timeout (ms)</label>
+                        <input
+                          type="number"
+                          min="500"
+                          step="1000"
+                          value={data.timeoutMs ?? 15000}
+                          onChange={(e) => update({ timeoutMs: Math.max(500, parseInt(e.target.value) || 15000) })}
+                          className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-800/60">
+                      <span>Stops when condition matches, max attempts reached, or timeout elapses.</span>
+                    </div>
+                  </div>
                 </>
               )}
 

@@ -385,7 +385,23 @@ public class TestWorkflowService {
             dbConfig.setQuery((String) data.getOrDefault("query", "SELECT status FROM orders WHERE id = '${orderId}'"));
             dbConfig.setCondition((String) data.getOrDefault("condition", "row.status == 'COMPLETED'"));
             if (data.get("timeoutMs") != null) {
-                dbConfig.setTimeoutMs(Long.parseLong(String.valueOf(data.get("timeoutMs"))));
+                try {
+                    dbConfig.setTimeoutMs(Long.parseLong(String.valueOf(data.get("timeoutMs"))));
+                } catch (Exception ignored) {}
+            }
+            if (data.get("pollIntervalMs") != null) {
+                try {
+                    dbConfig.setPollIntervalMs(Long.parseLong(String.valueOf(data.get("pollIntervalMs"))));
+                } catch (Exception ignored) {}
+            }
+            if (data.get("maxAttempts") != null) {
+                try {
+                    dbConfig.setMaxAttempts(Integer.parseInt(String.valueOf(data.get("maxAttempts"))));
+                } catch (Exception ignored) {}
+            } else if (data.get("retryCount") != null) {
+                try {
+                    dbConfig.setMaxAttempts(Integer.parseInt(String.valueOf(data.get("retryCount"))));
+                } catch (Exception ignored) {}
             }
             step.setDbPollConfig(dbConfig);
 
