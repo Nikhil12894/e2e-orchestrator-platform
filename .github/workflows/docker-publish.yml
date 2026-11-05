@@ -2,8 +2,8 @@ name: Build and Publish Multi-Platform Docker Images
 
 on:
   push:
-    branches:
-      - main
+#    branches:
+#      - main
     tags:
       - 'v*.*.*'
       - 'v*'
