@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.UUID;
@@ -233,6 +234,14 @@ public class TestWorkflowService {
 
             if (data.get("headers") instanceof Map) {
                 httpConfig.setHeaders((Map<String, String>) data.get("headers"));
+            }
+            if (data.get("inheritGlobalHeaders") != null) {
+                httpConfig.setInheritGlobalHeaders(Boolean.TRUE.equals(data.get("inheritGlobalHeaders"))
+                        || !"false".equalsIgnoreCase(String.valueOf(data.get("inheritGlobalHeaders"))));
+            }
+            if (data.get("excludedGlobalHeaders") instanceof List<?> list) {
+                List<String> excluded = list.stream().filter(Objects::nonNull).map(Object::toString).toList();
+                httpConfig.setExcludedGlobalHeaders(new ArrayList<>(excluded));
             }
             if (data.get("params") instanceof Map) {
                 httpConfig.setParams((Map<String, String>) data.get("params"));

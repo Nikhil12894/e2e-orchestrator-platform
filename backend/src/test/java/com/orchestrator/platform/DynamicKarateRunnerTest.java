@@ -95,6 +95,13 @@ class DynamicKarateRunnerTest {
 
         TestWorkflowEntity workflow = workflows.get(0);
 
+        // Adjust localhost URLs to use random port
+        workflow.getWorkflowAst().getSteps().forEach(step -> {
+            if (step.getHttpConfig() != null && step.getHttpConfig().getUrl() != null) {
+                step.getHttpConfig().setUrl(step.getHttpConfig().getUrl().replace("8080", String.valueOf(port)));
+            }
+        });
+
         // Configure default headers, dynamic headers, env properties and secrets
         java.util.LinkedHashMap<String, String> defaultHeaders = new java.util.LinkedHashMap<>();
         defaultHeaders.put("X-Custom-Flow", "FlowTestValue");

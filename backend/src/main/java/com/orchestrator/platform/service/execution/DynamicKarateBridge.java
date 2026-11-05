@@ -111,6 +111,54 @@ public class DynamicKarateBridge {
         return rawStep;
     }
 
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> computeEffectiveHeaders(Map<String, Object> flowHeaders, Map<String, Object> stepConfig) {
+        if (stepConfig == null) {
+            return flowHeaders != null ? new LinkedHashMap<>(flowHeaders) : new LinkedHashMap<>();
+        }
+
+        boolean inherit = true;
+        if (stepConfig.containsKey("inheritGlobalHeaders")) {
+            Object val = stepConfig.get("inheritGlobalHeaders");
+            inherit = (val instanceof Boolean b) ? b : !"false".equalsIgnoreCase(String.valueOf(val));
+        }
+
+        Map<String, Object> effective = new LinkedHashMap<>();
+        if (inherit && flowHeaders != null) {
+            effective.putAll(flowHeaders);
+        }
+
+        // Case-insensitive removal of excluded global headers
+        Object excludedObj = stepConfig.get("excludedGlobalHeaders");
+        if (excludedObj instanceof List<?> excludedList) {
+            for (Object item : excludedList) {
+                if (item != null) {
+                    String toRemove = item.toString().trim();
+                    effective.keySet().removeIf(k -> k.equalsIgnoreCase(toRemove));
+                }
+            }
+        }
+
+        // Merge step custom headers (adding or overriding)
+        Object stepHeadersObj = stepConfig.get("headers");
+        if (stepHeadersObj instanceof Map<?, ?> stepHeaders) {
+            for (Map.Entry<?, ?> entry : stepHeaders.entrySet()) {
+                if (entry.getKey() != null) {
+                    String key = entry.getKey().toString().trim();
+                    Object val = entry.getValue();
+                    if (val == null || val.toString().trim().isEmpty()) {
+                        // Empty value explicitly suppresses this header
+                        effective.remove(key);
+                    } else {
+                        effective.put(key, val);
+                    }
+                }
+            }
+        }
+
+        return effective;
+    }
+
     public static void onStepStart(String executionId, String stepId, String stepName, String stepType) {
         if (instance == null) return;
         UUID execId = parseUuid(executionId);
@@ -312,6 +360,17 @@ public class DynamicKarateBridge {
                                        Map<String, Object> extractedVars,
                                        List<String> assertionDetails,
                                        String errorMessage) {
+        onStepFinished(executionId, step, success, httpStatus, reqBody, respBody, extractedVars, assertionDetails, errorMessage, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static void onStepFinished(String executionId, Map<String, Object> step,
+                                       boolean success, int httpStatus,
+                                       Object reqBody, Object respBody,
+                                       Map<String, Object> extractedVars,
+                                       List<String> assertionDetails,
+                                       String errorMessage,
+                                       Map<String, Object> reqHeaders) {
         if (instance == null || step == null) return;
         UUID execId = parseUuid(executionId);
         String stepId = String.valueOf(step.get("id"));
@@ -332,6 +391,9 @@ public class DynamicKarateBridge {
         stepResult.setStatus(success ? ExecutionStatus.COMPLETED : ExecutionStatus.FAILED);
         stepResult.setDurationMs(duration);
         stepResult.setRequestPayload(reqBody);
+        if (reqHeaders != null) {
+            stepResult.setRequestHeaders(reqHeaders);
+        }
         stepResult.setResponsePayload(respBody);
         stepResult.setHttpStatus(httpStatus > 0 ? httpStatus : null);
         stepResult.setAssertionsPassed(success);

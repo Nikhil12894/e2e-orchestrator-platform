@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import {
   Node,
   Edge,
@@ -12,13 +12,10 @@ import {
 } from '@xyflow/react';
 
 import { Navbar } from './components/navbar/Navbar';
-import { CreateWorkflowModal } from './components/navbar/CreateWorkflowModal';
-import { WorkflowSettingsModal } from './components/navbar/WorkflowSettingsModal';
 import { ApiCatalogSidebar } from './components/catalog/ApiCatalogSidebar';
 import { FlowCanvas } from './components/canvas/FlowCanvas';
 import { NodeConfigDrawer } from './components/drawer/NodeConfigDrawer';
 import { LiveExecutionConsole } from './components/console/LiveExecutionConsole';
-import { ReportViewerModal } from './components/console/ReportViewerModal';
 import { workflowApi, executionApi } from './api/client';
 import {
   TestWorkflow,
@@ -28,6 +25,16 @@ import {
   CanvasEdge,
   CanvasNodeData,
 } from './types/workflow';
+
+const CreateWorkflowModal = React.lazy(() =>
+  import('./components/navbar/CreateWorkflowModal').then((m) => ({ default: m.CreateWorkflowModal }))
+);
+const WorkflowSettingsModal = React.lazy(() =>
+  import('./components/navbar/WorkflowSettingsModal').then((m) => ({ default: m.WorkflowSettingsModal }))
+);
+const ReportViewerModal = React.lazy(() =>
+  import('./components/console/ReportViewerModal').then((m) => ({ default: m.ReportViewerModal }))
+);
 
 export function App() {
   const [workflows, setWorkflows] = useState<TestWorkflow[]>([]);
@@ -513,7 +520,7 @@ export function App() {
   }));
 
   return (
-    <div className="w-screen h-screen flex flex-col bg-slate-950 overflow-hidden text-slate-100 font-sans">
+    <div className="w-screen h-screen flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden text-slate-900 dark:text-slate-100 font-sans transition-colors duration-150">
       {/* Top Navbar */}
       <Navbar
         workflows={workflows}
@@ -568,6 +575,10 @@ export function App() {
           allNodes={allCanvasNodes}
           edges={edges.map((e) => ({ id: e.id, source: e.source, target: e.target }))}
           onDeleteEdge={handleDeleteEdge}
+          workflowHeaders={{
+            ...(selectedWorkflow?.canvasState?.defaultHeaders || {}),
+            ...(selectedWorkflow?.canvasState?.dynamicHeaders || {}),
+          }}
         />
       </div>
 
@@ -580,29 +591,38 @@ export function App() {
         onViewReport={(url) => setReportModalUrl(url)}
       />
 
-      {/* Embedded Karate HTML & Profiling Report Modal */}
-      <ReportViewerModal
-        isOpen={!!reportModalUrl}
-        onClose={() => setReportModalUrl(null)}
-        reportUrl={reportModalUrl}
-        workflowName={selectedWorkflow?.name || 'Workflow Run'}
-      />
+      {/* Lazy Modals loaded on-demand */}
+      <Suspense fallback={null}>
+        {/* Embedded Karate HTML & Profiling Report Modal */}
+        {reportModalUrl && (
+          <ReportViewerModal
+            isOpen={!!reportModalUrl}
+            onClose={() => setReportModalUrl(null)}
+            reportUrl={reportModalUrl}
+            workflowName={selectedWorkflow?.name || 'Workflow Run'}
+          />
+        )}
 
-      {/* Create New Workflow Modal */}
-      <CreateWorkflowModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onCreate={handleCreateCustomWorkflow}
-      />
+        {/* Create New Workflow Modal */}
+        {isCreateModalOpen && (
+          <CreateWorkflowModal
+            isOpen={isCreateModalOpen}
+            onClose={() => setIsCreateModalOpen(false)}
+            onCreate={handleCreateCustomWorkflow}
+          />
+        )}
 
-      {/* Workflow Settings & Variables Modal */}
-      <WorkflowSettingsModal
-        isOpen={isSettingsModalOpen}
-        onClose={() => setIsSettingsModalOpen(false)}
-        workflow={selectedWorkflow}
-        onSaveSettings={handleSaveWorkflowSettings}
-        onDeleteWorkflow={handleDeleteWorkflow}
-      />
+        {/* Workflow Settings & Variables Modal */}
+        {isSettingsModalOpen && (
+          <WorkflowSettingsModal
+            isOpen={isSettingsModalOpen}
+            onClose={() => setIsSettingsModalOpen(false)}
+            workflow={selectedWorkflow}
+            onSaveSettings={handleSaveWorkflowSettings}
+            onDeleteWorkflow={handleDeleteWorkflow}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }

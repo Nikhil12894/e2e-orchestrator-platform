@@ -16,4 +16,32 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    target: 'es2022',
+    cssCodeSplit: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('@xyflow')) {
+              return 'vendor-xyflow';
+            }
+            if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
+              return 'vendor-react';
+            }
+            if (id.includes('lucide-react')) {
+              return 'vendor-icons';
+            }
+            if (id.includes('@stomp') || id.includes('sockjs-client')) {
+              return 'vendor-websocket';
+            }
+            if (id.includes('axios')) {
+              return 'vendor-network';
+            }
+            return 'vendor-misc';
+          }
+        },
+      },
+    },
+  },
 });

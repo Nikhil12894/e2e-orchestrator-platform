@@ -238,6 +238,12 @@ public class WorkflowReportGenerator {
 
             // Payloads
             html.append("          <div class=\"payload-grid\">\n");
+            if (sr.getRequestHeaders() != null && !sr.getRequestHeaders().isEmpty()) {
+                html.append("            <div class=\"payload-col\">\n");
+                html.append("              <h4 class=\"sub-title\">Effective Request Headers</h4>\n");
+                html.append("              <div class=\"code-block\"><pre>").append(escapeHtml(formatJson(sr.getRequestHeaders()))).append("</pre></div>\n");
+                html.append("            </div>\n");
+            }
             if (sr.getRequestPayload() != null) {
                 html.append("            <div class=\"payload-col\">\n");
                 html.append("              <h4 class=\"sub-title\">Request Payload</h4>\n");

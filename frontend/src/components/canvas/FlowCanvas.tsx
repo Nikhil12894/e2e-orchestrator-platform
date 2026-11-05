@@ -22,6 +22,7 @@ import { KafkaAssertNode } from './nodes/KafkaAssertNode';
 import { DelayNode } from './nodes/DelayNode';
 import { RemovableEdge } from './edges/RemovableEdge';
 import { CanvasNode, CanvasEdge } from '../../types/workflow';
+import { useTheme } from '../../context/ThemeContext';
 
 const nodeTypes: any = {
   httpRequest: HttpRequestNode,
@@ -58,6 +59,7 @@ const FlowCanvasInner: React.FC<FlowCanvasInnerProps> = ({
 }) => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
+  const { resolvedTheme } = useTheme();
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -105,10 +107,10 @@ const FlowCanvasInner: React.FC<FlowCanvasInnerProps> = ({
         }}
         fitView
         deleteKeyCode={['Backspace', 'Delete']}
-        className="bg-slate-950"
+        className="bg-slate-50 dark:bg-slate-950 transition-colors"
       >
-        <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#1e293b" />
-        <Controls className="!bg-slate-900 !border-slate-800 !shadow-xl [&>button]:!border-slate-800 [&>button]:!text-slate-300 [&>button:hover]:!bg-slate-800" />
+        <Background variant={BackgroundVariant.Dots} gap={16} size={1} color={resolvedTheme === 'dark' ? '#1e293b' : '#cbd5e1'} />
+        <Controls className="!bg-white dark:!bg-slate-900 !border-slate-200 dark:!border-slate-800 !shadow-lg [&>button]:!border-slate-200 dark:[&>button]:!border-slate-800 [&>button]:!text-slate-600 dark:[&>button]:!text-slate-300 [&>button:hover]:!bg-slate-100 dark:[&>button:hover]:!bg-slate-800" />
         <MiniMap
           nodeColor={(n) => {
             if (n.type === 'httpRequest') return '#3b82f6';
@@ -117,8 +119,8 @@ const FlowCanvasInner: React.FC<FlowCanvasInnerProps> = ({
             if (n.type === 'delay') return '#06b6d4';
             return '#64748b';
           }}
-          maskColor="rgba(11, 15, 25, 0.8)"
-          className="!bg-slate-900 !border-slate-800 !rounded-xl !overflow-hidden !shadow-2xl"
+          maskColor={resolvedTheme === 'dark' ? 'rgba(11, 15, 25, 0.8)' : 'rgba(241, 245, 249, 0.85)'}
+          className="!bg-white dark:!bg-slate-900 !border-slate-200 dark:!border-slate-800 !rounded-xl !overflow-hidden !shadow-lg"
         />
       </ReactFlow>
     </div>

@@ -44,6 +44,8 @@ export interface HttpRequestStepConfig {
   url: string;
   method: HttpMethod;
   headers?: Record<string, string>;
+  inheritGlobalHeaders?: boolean;
+  excludedGlobalHeaders?: string[];
   params?: Record<string, string>;
   body?: any;
   expectedStatus?: number;
@@ -108,6 +110,8 @@ export interface CanvasNodeData {
   method?: HttpMethod;
   url?: string;
   headers?: Record<string, string>;
+  inheritGlobalHeaders?: boolean;
+  excludedGlobalHeaders?: string[];
   params?: Record<string, string>;
   body?: any;
   expectedStatus?: number;
@@ -179,6 +183,7 @@ export interface ExecutionStepResult {
   startTime?: string;
   endTime?: string;
   durationMs?: number;
+  requestHeaders?: Record<string, any>;
   requestPayload?: any;
   responsePayload?: any;
   httpStatus?: number;

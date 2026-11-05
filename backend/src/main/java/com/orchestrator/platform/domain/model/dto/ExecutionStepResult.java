@@ -18,6 +18,7 @@ public class ExecutionStepResult implements Serializable {
     private Instant endTime;
     private Long durationMs;
     private Object requestPayload;
+    private Map<String, Object> requestHeaders = new HashMap<>();
     private Object responsePayload;
     private Integer httpStatus;
     private boolean assertionsPassed = true;
@@ -51,6 +52,9 @@ public class ExecutionStepResult implements Serializable {
 
     public Object getRequestPayload() { return requestPayload; }
     public void setRequestPayload(Object requestPayload) { this.requestPayload = requestPayload; }
+
+    public Map<String, Object> getRequestHeaders() { return requestHeaders; }
+    public void setRequestHeaders(Map<String, Object> requestHeaders) { this.requestHeaders = requestHeaders; }
 
     public Object getResponsePayload() { return responsePayload; }
     public void setResponsePayload(Object responsePayload) { this.responsePayload = responsePayload; }

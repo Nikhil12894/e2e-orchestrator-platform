@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -19,7 +19,10 @@ import {
 } from 'lucide-react';
 import { ApiEndpoint, HttpMethod } from '../../types/workflow';
 import { catalogApi } from '../../api/client';
-import { ImportSpecModal } from './ImportSpecModal';
+
+const ImportSpecModal = React.lazy(() =>
+  import('./ImportSpecModal').then((m) => ({ default: m.ImportSpecModal }))
+);
 
 const methodBadges: Record<HttpMethod, string> = {
   GET: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
@@ -160,33 +163,33 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
 
   return (
     <>
-      <aside className="w-80 h-full bg-slate-900 border-r border-slate-800 flex flex-col z-20 shrink-0 select-none">
+      <aside className="w-80 h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col z-20 shrink-0 select-none transition-colors">
         {/* Header */}
-        <div className="p-4 border-b border-slate-800">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Layers className="w-4 h-4 text-blue-400" />
-              <h2 className="font-semibold text-xs text-slate-200 tracking-wide uppercase">API Catalog</h2>
+              <Layers className="w-4 h-4 text-blue-500 dark:text-blue-400" />
+              <h2 className="font-semibold text-xs text-slate-800 dark:text-slate-200 tracking-wide uppercase">API Catalog</h2>
             </div>
             <button
               onClick={fetchEndpoints}
               disabled={loading}
               title="Refresh Catalog"
-              className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+              className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-400' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-500' : ''}`} />
             </button>
           </div>
 
           {/* Search bar */}
           <div className="relative mb-3">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Filter endpoints or tags..."
-              className="w-full pl-8 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -194,14 +197,14 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
           <div className="grid grid-cols-3 gap-1.5">
             <button
               onClick={() => setIsImportModalOpen(true)}
-              className="flex items-center justify-center gap-1 py-1.5 px-2 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-500/20 rounded-lg text-[10px] font-medium transition-colors"
+              className="flex items-center justify-center gap-1 py-1.5 px-2 bg-blue-600/10 hover:bg-blue-600/20 text-blue-600 dark:text-blue-400 border border-blue-500/20 rounded-lg text-[10px] font-medium transition-colors"
             >
               <Plus className="w-3 h-3" />
               Import
             </button>
             <button
               onClick={handleSeedSamples}
-              className="flex items-center justify-center gap-1 py-1.5 px-2 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border border-emerald-500/20 rounded-lg text-[10px] font-medium transition-colors"
+              className="flex items-center justify-center gap-1 py-1.5 px-2 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 rounded-lg text-[10px] font-medium transition-colors"
             >
               <Sparkles className="w-3 h-3" />
               Seed
@@ -209,7 +212,7 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
             <button
               onClick={() => setIsClearConfirmOpen(true)}
               disabled={endpoints.length === 0}
-              className="flex items-center justify-center gap-1 py-1.5 px-2 bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 border border-rose-500/20 rounded-lg text-[10px] font-medium transition-colors disabled:opacity-40"
+              className="flex items-center justify-center gap-1 py-1.5 px-2 bg-rose-600/10 hover:bg-rose-600/20 text-rose-600 dark:text-rose-400 border border-rose-500/20 rounded-lg text-[10px] font-medium transition-colors disabled:opacity-40"
             >
               <Trash2 className="w-3 h-3" />
               Clear
@@ -218,7 +221,7 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
         </div>
 
         {/* Step Node Toolbox */}
-        <div className="p-3 border-b border-slate-800 bg-slate-950/40">
+        <div className="p-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40">
           <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-2 px-1">
             Drag Nodes to Canvas
           </span>
@@ -234,10 +237,10 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
                   timeoutMs: 15000,
                 })
               }
-              className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-amber-500/40 hover:bg-amber-500/5 cursor-grab active:cursor-grabbing transition-all group"
+              className="flex flex-col items-center justify-center p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-amber-500/40 hover:bg-amber-500/5 cursor-grab active:cursor-grabbing transition-all group shadow-sm"
             >
-              <Database className="w-4 h-4 text-amber-400 mb-1 group-hover:scale-110 transition-transform" />
-              <span className="text-[10px] font-medium text-slate-300">DB Poll</span>
+              <Database className="w-4 h-4 text-amber-500 dark:text-amber-400 mb-1 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-medium text-slate-700 dark:text-slate-300">DB Poll</span>
             </div>
 
             <div
@@ -251,10 +254,10 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
                   expectedValue: 'CONFIRMED',
                 })
               }
-              className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-purple-500/40 hover:bg-purple-500/5 cursor-grab active:cursor-grabbing transition-all group"
+              className="flex flex-col items-center justify-center p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-purple-500/40 hover:bg-purple-500/5 cursor-grab active:cursor-grabbing transition-all group shadow-sm"
             >
-              <Radio className="w-4 h-4 text-purple-400 mb-1 group-hover:scale-110 transition-transform" />
-              <span className="text-[10px] font-medium text-slate-300">Kafka</span>
+              <Radio className="w-4 h-4 text-purple-500 dark:text-purple-400 mb-1 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-medium text-slate-700 dark:text-slate-300">Kafka</span>
             </div>
 
             <div
@@ -265,10 +268,10 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
                   delayMs: 2000,
                 })
               }
-              className="flex flex-col items-center justify-center p-2 rounded-lg bg-slate-900 border border-slate-800 hover:border-cyan-500/40 hover:bg-cyan-500/5 cursor-grab active:cursor-grabbing transition-all group"
+              className="flex flex-col items-center justify-center p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-cyan-500/40 hover:bg-cyan-500/5 cursor-grab active:cursor-grabbing transition-all group shadow-sm"
             >
-              <Timer className="w-4 h-4 text-cyan-400 mb-1 group-hover:scale-110 transition-transform" />
-              <span className="text-[10px] font-medium text-slate-300">Delay</span>
+              <Timer className="w-4 h-4 text-cyan-500 dark:text-cyan-400 mb-1 group-hover:scale-110 transition-transform" />
+              <span className="text-[10px] font-medium text-slate-700 dark:text-slate-300">Delay</span>
             </div>
           </div>
         </div>
@@ -277,31 +280,31 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {Object.keys(groupedEndpoints).length === 0 ? (
             <div className="text-center py-10 px-4">
-              <FolderOpen className="w-8 h-8 text-slate-600 mx-auto mb-2 opacity-50" />
-              <p className="text-xs text-slate-400 font-medium">No endpoints in catalog</p>
-              <p className="text-[11px] text-slate-500 mt-1">Import a spec or click "Seed APIs" to load demo services</p>
+              <FolderOpen className="w-8 h-8 text-slate-400 dark:text-slate-600 mx-auto mb-2 opacity-50" />
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">No endpoints in catalog</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">Import a spec or click "Seed APIs" to load demo services</p>
             </div>
           ) : (
             Object.entries(groupedEndpoints).map(([service, eps]) => {
               const isCollapsed = collapsedServices[service];
               return (
-                <div key={service} className="rounded-lg border border-slate-800/80 bg-slate-950/40 overflow-hidden">
+                <div key={service} className="rounded-lg border border-slate-200 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/40 overflow-hidden shadow-sm">
                   {/* Service Header */}
                   <div
                     onClick={() => toggleService(service)}
-                    className="w-full flex items-center justify-between px-3 py-2 bg-slate-900/60 hover:bg-slate-900 text-left transition-colors cursor-pointer select-none"
+                    className="w-full flex items-center justify-between px-3 py-2 bg-slate-100/70 dark:bg-slate-900/60 hover:bg-slate-200/60 dark:hover:bg-slate-900 text-left transition-colors cursor-pointer select-none"
                   >
                     <div className="flex items-center gap-2">
                       {isCollapsed ? (
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                       ) : (
-                        <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                       )}
-                      <Server className="w-3.5 h-3.5 text-blue-400" />
-                      <span className="font-semibold text-xs text-slate-200">{service}</span>
+                      <Server className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
+                      <span className="font-semibold text-xs text-slate-800 dark:text-slate-200">{service}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400">
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                         {eps.length}
                       </span>
                       <button
@@ -310,7 +313,7 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
                           setServiceToDelete({ name: service, count: eps.length });
                         }}
                         title={`Delete ${service} spec & endpoints`}
-                        className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                        className="p-1 rounded text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
@@ -327,26 +330,26 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
                             key={ep.id}
                             draggable
                             onDragStart={(e) => handleDragStart(e, ep)}
-                            className="group flex items-center justify-between p-2 rounded-md hover:bg-slate-900/80 border border-transparent hover:border-slate-800 cursor-grab active:cursor-grabbing transition-all"
+                            className="group flex items-center justify-between p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-900/80 border border-transparent hover:border-slate-200 dark:hover:border-slate-800 cursor-grab active:cursor-grabbing transition-all"
                           >
                             <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <GripVertical className="w-3 h-3 text-slate-600 group-hover:text-slate-400 shrink-0" />
+                              <GripVertical className="w-3 h-3 text-slate-400 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-400 shrink-0" />
                               <span
                                 className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider border shrink-0 ${badgeStyle}`}
                               >
                                 {ep.httpMethod}
                               </span>
                               <div className="min-w-0 flex-1">
-                                <p className="text-[11px] font-medium text-slate-300 truncate group-hover:text-blue-400 transition-colors">
+                                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                   {ep.summary || ep.operationId || ep.endpointPath}
                                 </p>
-                                <p className="text-[10px] font-mono text-slate-500 truncate">{ep.endpointPath}</p>
+                                <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate">{ep.endpointPath}</p>
                               </div>
                             </div>
                             <button
                               onClick={(e) => handleDeleteEndpoint(e, ep.id)}
                               title="Delete endpoint from catalog"
-                              className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-rose-400 transition-opacity"
+                              className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-all"
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
@@ -374,14 +377,14 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
                 <h3 className="text-sm font-semibold text-slate-100">Remove Microservice?</h3>
                 <p className="text-xs text-slate-400">
                   Delete <span className="text-rose-300 font-semibold">{serviceToDelete.name}</span> and all{' '}
-                  <span className="font-mono text-slate-200">{serviceToDelete.count}</span> endpoints from the catalog.
+                  <span className="font-mono text-slate-800 dark:text-slate-200">{serviceToDelete.count}</span> endpoints from the catalog.
                 </p>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
               <button
                 onClick={() => setServiceToDelete(null)}
-                className="px-3 py-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-300 text-xs font-medium transition-colors"
+                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors"
               >
                 Cancel
               </button>
@@ -398,23 +401,23 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
 
       {/* Clear Entire Catalog Confirmation Modal */}
       {isClearConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 select-none">
-          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-5 space-y-4 animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 select-none">
+          <div className="w-full max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-5 space-y-4 animate-in fade-in zoom-in-95 text-slate-800 dark:text-slate-200">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
+              <div className="w-10 h-10 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 shrink-0">
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-slate-100">Clear Entire Catalog?</h3>
-                <p className="text-xs text-slate-400">
-                  This will remove all <span className="font-semibold text-rose-300">{endpoints.length}</span> endpoints across all services from the catalog.
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Clear Entire Catalog?</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  This will remove all <span className="font-semibold text-rose-500 dark:text-rose-300">{endpoints.length}</span> endpoints across all services from the catalog.
                 </p>
               </div>
             </div>
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
               <button
                 onClick={() => setIsClearConfirmOpen(false)}
-                className="px-3 py-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 text-slate-300 text-xs font-medium transition-colors"
+                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors"
               >
                 Cancel
               </button>
@@ -430,11 +433,15 @@ export const ApiCatalogSidebar: React.FC<ApiCatalogSidebarProps> = ({
       )}
 
       {/* Import Modal */}
-      <ImportSpecModal
-        isOpen={isImportModalOpen}
-        onClose={() => setIsImportModalOpen(false)}
-        onSuccess={fetchEndpoints}
-      />
+      {isImportModalOpen && (
+        <Suspense fallback={null}>
+          <ImportSpecModal
+            isOpen={isImportModalOpen}
+            onClose={() => setIsImportModalOpen(false)}
+            onSuccess={fetchEndpoints}
+          />
+        </Suspense>
+      )}
     </>
   );
 };

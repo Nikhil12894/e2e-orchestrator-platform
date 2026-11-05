@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import {
   X,
   Settings,
@@ -11,10 +11,15 @@ import {
   Variable,
   Sliders,
   CheckCircle,
-  HelpCircle
+  HelpCircle,
+  Ban,
+  Check
 } from 'lucide-react';
 import { CanvasNode, CanvasNodeData, HttpMethod, StepAssertion, VariableExtraction } from '../../types/workflow';
-import { VariableSelectorModal } from './VariableSelectorModal';
+
+const VariableSelectorModal = React.lazy(() =>
+  import('./VariableSelectorModal').then((m) => ({ default: m.VariableSelectorModal }))
+);
 
 interface NodeConfigDrawerProps {
   isOpen: boolean;
@@ -24,6 +29,7 @@ interface NodeConfigDrawerProps {
   allNodes: CanvasNode[];
   edges?: Array<{ id: string; source: string; target: string }>;
   onDeleteEdge?: (edgeId: string) => void;
+  workflowHeaders?: Record<string, string>;
 }
 
 export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
@@ -34,6 +40,7 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
   allNodes,
   edges = [],
   onDeleteEdge,
+  workflowHeaders = {},
 }) => {
   const [activeTab, setActiveTab] = useState<'config' | 'extractions' | 'assertions'>('config');
   const [isVarModalOpen, setIsVarModalOpen] = useState(false);
@@ -47,6 +54,85 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
   const update = (patch: Partial<CanvasNodeData>) => {
     onUpdateNodeData(selectedNode.id, patch);
   };
+
+  const inheritGlobal = data.inheritGlobalHeaders !== false;
+  const excludedList: string[] = data.excludedGlobalHeaders || [];
+  const globalKeys = Object.keys(workflowHeaders || {});
+
+  const toggleExcludeGlobalHeader = (headerName: string) => {
+    const isAlreadyExcluded = excludedList.some((h) => h.toLowerCase() === headerName.toLowerCase());
+    let newExcluded: string[];
+    if (isAlreadyExcluded) {
+      newExcluded = excludedList.filter((h) => h.toLowerCase() !== headerName.toLowerCase());
+    } else {
+      newExcluded = [...excludedList, headerName];
+    }
+    update({ excludedGlobalHeaders: newExcluded });
+  };
+
+  const setInheritMode = (mode: 'all' | 'selective' | 'none') => {
+    if (mode === 'none') {
+      update({ inheritGlobalHeaders: false });
+    } else if (mode === 'all') {
+      update({ inheritGlobalHeaders: true, excludedGlobalHeaders: [] });
+    } else {
+      update({ inheritGlobalHeaders: true });
+    }
+  };
+
+  // Compute effective headers preview
+  const effectiveHeadersList: Array<{
+    key: string;
+    value: string;
+    origin: 'global' | 'overridden' | 'custom' | 'excluded';
+  }> = [];
+
+  globalKeys.forEach((k) => {
+    const isExcluded = !inheritGlobal || excludedList.some((ex) => ex.toLowerCase() === k.toLowerCase());
+    const isOverridden = data.headers && Object.prototype.hasOwnProperty.call(data.headers, k);
+
+    if (isExcluded) {
+      effectiveHeadersList.push({
+        key: k,
+        value: (workflowHeaders || {})[k],
+        origin: 'excluded',
+      });
+    } else if (isOverridden) {
+      const customVal = data.headers![k];
+      if (customVal && customVal.trim() !== '') {
+        effectiveHeadersList.push({
+          key: k,
+          value: customVal,
+          origin: 'overridden',
+        });
+      } else {
+        effectiveHeadersList.push({
+          key: k,
+          value: (workflowHeaders || {})[k],
+          origin: 'excluded',
+        });
+      }
+    } else {
+      effectiveHeadersList.push({
+        key: k,
+        value: (workflowHeaders || {})[k],
+        origin: 'global',
+      });
+    }
+  });
+
+  Object.entries(data.headers || {}).forEach(([k, v]) => {
+    const isGlobal = globalKeys.some((gk) => gk.toLowerCase() === k.toLowerCase());
+    if (!isGlobal && v && v.trim() !== '') {
+      effectiveHeadersList.push({
+        key: k,
+        value: v,
+        origin: 'custom',
+      });
+    }
+  });
+
+  const activeEffectiveCount = effectiveHeadersList.filter((h) => h.origin !== 'excluded').length;
 
   const openVarSelector = (fieldName: string) => {
     setVarTargetField(fieldName);
@@ -130,37 +216,37 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
 
   return (
     <>
-      <div className="fixed inset-y-0 right-0 z-40 w-96 bg-slate-900 border-l border-slate-800 shadow-2xl flex flex-col select-none">
+      <div className="fixed inset-y-0 right-0 z-40 w-96 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col select-none transition-colors">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-slate-950/60">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400">
+            <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500 dark:text-blue-400">
               {nodeType === 'httpRequest' && <Globe className="w-4 h-4" />}
-              {nodeType === 'dbPoll' && <Database className="w-4 h-4 text-amber-400" />}
-              {nodeType === 'kafkaAssert' && <Radio className="w-4 h-4 text-purple-400" />}
-              {nodeType === 'delay' && <Timer className="w-4 h-4 text-cyan-400" />}
+              {nodeType === 'dbPoll' && <Database className="w-4 h-4 text-amber-500 dark:text-amber-400" />}
+              {nodeType === 'kafkaAssert' && <Radio className="w-4 h-4 text-purple-500 dark:text-purple-400" />}
+              {nodeType === 'delay' && <Timer className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />}
             </div>
             <div className="min-w-0">
-              <h3 className="font-semibold text-xs text-slate-100 truncate">{data.name || 'Step Configuration'}</h3>
-              <span className="text-[10px] font-mono text-slate-500">ID: {selectedNode.id}</span>
+              <h3 className="font-semibold text-xs text-slate-800 dark:text-slate-100 truncate">{data.name || 'Step Configuration'}</h3>
+              <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">ID: {selectedNode.id}</span>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex border-b border-slate-800 bg-slate-950/30 px-3 pt-1">
+        <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 px-3 pt-1">
           <button
             onClick={() => setActiveTab('config')}
             className={`flex-1 py-2 text-xs font-medium border-b-2 transition-all ${
               activeTab === 'config'
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400 font-semibold'
+                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             Config
@@ -169,13 +255,13 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
             onClick={() => setActiveTab('extractions')}
             className={`flex-1 py-2 text-xs font-medium border-b-2 transition-all flex items-center justify-center gap-1.5 ${
               activeTab === 'extractions'
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400 font-semibold'
+                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             Extractions
             {(data.extractions?.length || 0) > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-500/20 text-emerald-400">
+              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
                 {data.extractions?.length}
               </span>
             )}
@@ -184,13 +270,13 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
             onClick={() => setActiveTab('assertions')}
             className={`flex-1 py-2 text-xs font-medium border-b-2 transition-all flex items-center justify-center gap-1.5 ${
               activeTab === 'assertions'
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400 font-semibold'
+                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
             Assertions
             {(data.assertions?.length || 0) > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-blue-500/20 text-blue-400">
+              <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-blue-500/20 text-blue-600 dark:text-blue-400">
                 {data.assertions?.length}
               </span>
             )}
@@ -260,106 +346,223 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                     />
                   </div>
 
-                  {/* Step HTTP Headers */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
+                  {/* Step HTTP Headers & Inheritance Control */}
+                  <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
                       <div>
-                        <label className="block text-[11px] font-medium text-slate-300">HTTP Headers</label>
-                        <span className="text-[10px] text-slate-500">Overrides workflow global headers</span>
+                        <label className="text-[11px] font-semibold text-slate-300 block">HTTP Request Headers</label>
+                        <span className="text-[10px] text-slate-500">Configure global inheritance, selective exclusions, and custom headers</span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const current = { ...(data.headers || {}) };
-                          current[`Header-${Object.keys(current).length + 1}`] = '';
-                          update({ headers: current });
-                        }}
-                        className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300"
-                      >
-                        <Plus className="w-3 h-3" />
-                        Add Header
-                      </button>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold">
+                        {activeEffectiveCount} Active
+                      </span>
                     </div>
 
-                    {Object.keys(data.headers || {}).length === 0 ? (
-                      <div className="p-3 bg-slate-950/60 border border-dashed border-slate-800 rounded-lg text-center">
-                        <p className="text-[10px] text-slate-500 mb-1">Inheriting workflow-level headers.</p>
+                    {/* Inheritance Mode Selector */}
+                    <div>
+                      <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1.5">
+                        Global Header Inheritance
+                      </span>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setInheritMode('all')}
+                          className={`px-2 py-1.5 rounded-lg text-[10px] font-semibold border transition-all ${
+                            inheritGlobal && excludedList.length === 0
+                              ? 'bg-blue-600/20 border-blue-500 text-blue-300 shadow-sm'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          Inherit All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setInheritMode('selective')}
+                          className={`px-2 py-1.5 rounded-lg text-[10px] font-semibold border transition-all ${
+                            inheritGlobal && excludedList.length > 0
+                              ? 'bg-amber-600/20 border-amber-500 text-amber-300 shadow-sm'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          Selective Exclude {excludedList.length > 0 ? `(${excludedList.length})` : ''}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setInheritMode('none')}
+                          className={`px-2 py-1.5 rounded-lg text-[10px] font-semibold border transition-all ${
+                            !inheritGlobal
+                              ? 'bg-rose-600/20 border-rose-500 text-rose-300 shadow-sm'
+                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          Do Not Inherit
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Global Headers Quick-Toggle Pills */}
+                    {globalKeys.length > 0 ? (
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-medium text-slate-400">Workflow Global Headers</span>
+                          <span className="text-[9px] text-slate-500">Click any pill to toggle exclusion</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {globalKeys.map((gKey) => {
+                            const isExcluded = !inheritGlobal || excludedList.some((ex) => ex.toLowerCase() === gKey.toLowerCase());
+                            const isOverridden = data.headers && Object.prototype.hasOwnProperty.call(data.headers, gKey) && data.headers[gKey]?.trim() !== '';
+                            return (
+                              <button
+                                key={gKey}
+                                type="button"
+                                onClick={() => {
+                                  if (!inheritGlobal) {
+                                    update({ inheritGlobalHeaders: true, excludedGlobalHeaders: globalKeys.filter((k) => k !== gKey) });
+                                  } else {
+                                    toggleExcludeGlobalHeader(gKey);
+                                  }
+                                }}
+                                title={isExcluded ? `Click to include ${gKey}` : `Click to exclude ${gKey}`}
+                                className={`px-2 py-1 rounded-md text-[10px] font-mono font-medium border flex items-center gap-1 transition-all ${
+                                  isExcluded
+                                    ? 'bg-slate-900/60 border-slate-800 text-slate-500 line-through'
+                                    : isOverridden
+                                    ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                                    : 'bg-blue-500/15 border-blue-500/30 text-blue-300'
+                                }`}
+                              >
+                                {isExcluded ? <Ban className="w-2.5 h-2.5 text-rose-400" /> : <Check className="w-2.5 h-2.5 text-emerald-400" />}
+                                <span>{gKey}</span>
+                                {isOverridden && <span className="text-[8px] bg-amber-500/30 px-1 rounded text-amber-200">Overridden</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-2 bg-slate-900/50 border border-slate-800 rounded-lg text-[10px] text-slate-500">
+                        No global headers currently configured in workflow settings.
+                      </div>
+                    )}
+
+                    {/* Step Custom Headers List */}
+                    <div className="pt-2 border-t border-slate-800/80">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-medium text-slate-300">Step Custom & Overriding Headers</span>
                         <button
                           type="button"
                           onClick={() => {
-                            update({
-                              headers: {
-                                ...(data.headers || {}),
-                                Authorization: 'Bearer ${authToken}',
-                              },
-                            });
+                            const current = { ...(data.headers || {}) };
+                            current[`Header-${Object.keys(current).length + 1}`] = '';
+                            update({ headers: current });
                           }}
-                          className="text-[10px] text-blue-400 hover:underline"
+                          className="flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300 font-medium"
                         >
-                          + Add Authorization: Bearer {'${authToken}'}
+                          <Plus className="w-3 h-3" />
+                          Add Custom Header
                         </button>
                       </div>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {Object.entries(data.headers || {}).map(([hKey, hVal], hIdx) => (
-                          <div key={hIdx} className="flex items-center gap-1.5">
-                            <input
-                              type="text"
-                              value={hKey}
-                              placeholder="Header-Name"
-                              onChange={(e) => {
-                                const newKey = e.target.value;
-                                const newHeaders: Record<string, string> = {};
-                                Object.entries(data.headers || {}).forEach(([k, v]) => {
-                                  if (k === hKey) {
-                                    newHeaders[newKey] = v;
-                                  } else {
-                                    newHeaders[k] = v;
-                                  }
-                                });
-                                update({ headers: newHeaders });
-                              }}
-                              className="w-1/2 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
-                            />
-                            <div className="flex-1 relative">
+
+                      {Object.keys(data.headers || {}).length === 0 ? (
+                        <p className="text-[10px] text-slate-500 italic py-1">No custom headers added for this step.</p>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {Object.entries(data.headers || {}).map(([hKey, hVal], hIdx) => (
+                            <div key={hIdx} className="flex items-center gap-1.5">
                               <input
                                 type="text"
-                                value={hVal}
-                                placeholder="Header-Value"
+                                value={hKey}
+                                placeholder="Header-Name"
                                 onChange={(e) => {
-                                  update({
-                                    headers: {
-                                      ...(data.headers || {}),
-                                      [hKey]: e.target.value,
-                                    },
+                                  const newKey = e.target.value;
+                                  const newHeaders: Record<string, string> = {};
+                                  Object.entries(data.headers || {}).forEach(([k, v]) => {
+                                    if (k === hKey) {
+                                      newHeaders[newKey] = v;
+                                    } else {
+                                      newHeaders[k] = v;
+                                    }
                                   });
+                                  update({ headers: newHeaders });
                                 }}
-                                className="w-full pr-6 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
+                                className="w-1/2 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
                               />
+                              <div className="flex-1 relative">
+                                <input
+                                  type="text"
+                                  value={hVal}
+                                  placeholder="Header-Value"
+                                  onChange={(e) => {
+                                    update({
+                                      headers: {
+                                        ...(data.headers || {}),
+                                        [hKey]: e.target.value,
+                                      },
+                                    });
+                                  }}
+                                  className="w-full pr-6 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => openVarSelector(`header_${hKey}`)}
+                                  title="Insert Variable"
+                                  className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-500 hover:text-emerald-400"
+                                >
+                                  <Variable className="w-3 h-3" />
+                                </button>
+                              </div>
                               <button
                                 type="button"
-                                onClick={() => openVarSelector(`header_${hKey}`)}
-                                title="Insert Variable"
-                                className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-500 hover:text-emerald-400"
+                                onClick={() => {
+                                  const newHeaders = { ...(data.headers || {}) };
+                                  delete newHeaders[hKey];
+                                  update({ headers: newHeaders });
+                                }}
+                                className="p-1 text-slate-500 hover:text-red-400"
                               >
-                                <Variable className="w-3 h-3" />
+                                <Trash2 className="w-3 h-3" />
                               </button>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newHeaders = { ...(data.headers || {}) };
-                                delete newHeaders[hKey];
-                                update({ headers: newHeaders });
-                              }}
-                              className="p-1 text-slate-500 hover:text-red-400"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Live Effective Headers Preview */}
+                    <div className="pt-2 border-t border-slate-800/80">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] uppercase font-semibold text-slate-400">
+                          Effective Headers Sent On Wire
+                        </span>
+                        <span className="text-[9px] text-slate-500 font-mono">Real-time preview</span>
                       </div>
-                    )}
+                      {effectiveHeadersList.length === 0 ? (
+                        <p className="text-[10px] text-slate-500 italic">No headers will be sent with this request.</p>
+                      ) : (
+                        <div className="space-y-1 p-2 bg-slate-900/60 rounded-lg border border-slate-800 max-h-36 overflow-y-auto font-mono text-[10px]">
+                          {effectiveHeadersList.map((item, idx) => (
+                            <div key={idx} className="flex items-center justify-between py-0.5 border-b border-slate-800/40 last:border-0">
+                              <span className={item.origin === 'excluded' ? 'text-slate-600 line-through' : 'text-slate-300 font-semibold'}>
+                                {item.key}: {item.value || '(empty)'}
+                              </span>
+                              <span
+                                className={`text-[8px] px-1.5 py-0.2 rounded font-sans uppercase font-bold shrink-0 ${
+                                  item.origin === 'global'
+                                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                    : item.origin === 'overridden'
+                                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                    : item.origin === 'custom'
+                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                    : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                }`}
+                              >
+                                {item.origin}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* JSON Body editor */}
@@ -845,13 +1048,17 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
       </div>
 
       {/* Variable Selector Modal */}
-      <VariableSelectorModal
-        isOpen={isVarModalOpen}
-        onClose={() => setIsVarModalOpen(false)}
-        onSelectVariable={handleInsertVariable}
-        availableNodes={allNodes}
-        currentNodeId={selectedNode.id}
-      />
+      {isVarModalOpen && (
+        <Suspense fallback={null}>
+          <VariableSelectorModal
+            isOpen={isVarModalOpen}
+            onClose={() => setIsVarModalOpen(false)}
+            onSelectVariable={handleInsertVariable}
+            availableNodes={allNodes}
+            currentNodeId={selectedNode.id}
+          />
+        </Suspense>
+      )}
     </>
   );
 };

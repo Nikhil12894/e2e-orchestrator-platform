@@ -7,6 +7,7 @@ import com.orchestrator.platform.domain.entity.WorkflowExecutionEntity;
 import com.orchestrator.platform.domain.enums.ExecutionStatus;
 import com.orchestrator.platform.domain.enums.StepType;
 import com.orchestrator.platform.domain.model.dto.ExecutionStepResult;
+import com.orchestrator.platform.service.execution.DynamicKarateBridge;
 import com.orchestrator.platform.service.execution.WorkflowReportGenerator;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,9 +16,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -136,5 +135,60 @@ public class DbExecutorAndReportExclusionTest {
         assertTrue(reportHtml.contains("67%"), "Success rate must be calculated on reportable steps (2/3 = 67%)");
         assertTrue(reportHtml.contains("1 auxiliary setup omitted"), "Must indicate that 1 auxiliary step was omitted from metrics");
         assertTrue(reportHtml.contains("UNCOUNTED / AUXILIARY"), "Diagnostics must tag uncounted auxiliary step");
+    }
+
+    @Test
+    @DisplayName("Verify granular HTTP node header inheritance, selective exclusions, and custom overrides")
+    public void testGranularHttpNodeHeaderInheritance() {
+        Map<String, Object> flowHeaders = new LinkedHashMap<>();
+        flowHeaders.put("Authorization", "Bearer global-jwt-token");
+        flowHeaders.put("Content-Type", "application/json");
+        flowHeaders.put("X-Tenant-Id", "tenant-alpha");
+
+        // Case 1: Default behavior - Inherit all global headers
+        Map<String, Object> stepConfig1 = new HashMap<>();
+        stepConfig1.put("inheritGlobalHeaders", true);
+        stepConfig1.put("headers", Map.of("X-Step-Id", "step-101"));
+
+        Map<String, Object> effective1 = DynamicKarateBridge.computeEffectiveHeaders(flowHeaders, stepConfig1);
+        assertEquals(4, effective1.size());
+        assertEquals("Bearer global-jwt-token", effective1.get("Authorization"));
+        assertEquals("application/json", effective1.get("Content-Type"));
+        assertEquals("tenant-alpha", effective1.get("X-Tenant-Id"));
+        assertEquals("step-101", effective1.get("X-Step-Id"));
+
+        // Case 2: Do Not Inherit (Standalone / Public step)
+        Map<String, Object> stepConfig2 = new HashMap<>();
+        stepConfig2.put("inheritGlobalHeaders", false);
+        stepConfig2.put("headers", Map.of("Content-Type", "application/x-www-form-urlencoded"));
+
+        Map<String, Object> effective2 = DynamicKarateBridge.computeEffectiveHeaders(flowHeaders, stepConfig2);
+        assertEquals(1, effective2.size(), "Must contain only step custom header, zero global headers");
+        assertFalse(effective2.containsKey("Authorization"), "Global Authorization must not be inherited");
+        assertFalse(effective2.containsKey("X-Tenant-Id"), "Global X-Tenant-Id must not be inherited");
+        assertEquals("application/x-www-form-urlencoded", effective2.get("Content-Type"));
+
+        // Case 3: Selective Exclude - Keep Content-Type & X-Tenant-Id, but omit Authorization
+        Map<String, Object> stepConfig3 = new HashMap<>();
+        stepConfig3.put("inheritGlobalHeaders", true);
+        stepConfig3.put("excludedGlobalHeaders", List.of("authorization")); // case-insensitive check
+        stepConfig3.put("headers", Map.of("X-Custom-Scope", "read:orders"));
+
+        Map<String, Object> effective3 = DynamicKarateBridge.computeEffectiveHeaders(flowHeaders, stepConfig3);
+        assertEquals(3, effective3.size());
+        assertFalse(effective3.containsKey("Authorization"), "Excluded Authorization must be stripped");
+        assertEquals("application/json", effective3.get("Content-Type"));
+        assertEquals("tenant-alpha", effective3.get("X-Tenant-Id"));
+        assertEquals("read:orders", effective3.get("X-Custom-Scope"));
+
+        // Case 4: Override Global Header with different step value
+        Map<String, Object> stepConfig4 = new HashMap<>();
+        stepConfig4.put("inheritGlobalHeaders", true);
+        stepConfig4.put("headers", Map.of("Authorization", "Bearer custom-admin-jwt"));
+
+        Map<String, Object> effective4 = DynamicKarateBridge.computeEffectiveHeaders(flowHeaders, stepConfig4);
+        assertEquals("Bearer custom-admin-jwt", effective4.get("Authorization"), "Step header must override global header");
+        assertEquals("application/json", effective4.get("Content-Type"));
+        assertEquals("tenant-alpha", effective4.get("X-Tenant-Id"));
     }
 }
