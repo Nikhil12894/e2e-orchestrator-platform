@@ -30,6 +30,7 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_FLYWAY_ENABLED: "true"
+      SPRING_FLYWAY_PLACEHOLDER_REPLACEMENT: "false"
       ORCHESTRATOR_REPORTS_PATH: /app/reports
     volumes:
       - reports_data:/app/reports

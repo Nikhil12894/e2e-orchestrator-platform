@@ -37,6 +37,7 @@ spring:
     enabled: ${SPRING_FLYWAY_ENABLED:true}
     baseline-on-migrate: true
     locations: classpath:db/migration
+    placeholder-replacement: ${SPRING_FLYWAY_PLACEHOLDER_REPLACEMENT:false}
 
 orchestrator:
   reports:
