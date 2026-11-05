@@ -213,8 +213,32 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ## 🐳 Docker Hub Build & Deployment
 
-### Build and Push Images to Docker Hub
-To build both frontend and backend Docker images and push them to your Docker Hub repository:
+### Multi-Architecture Support
+Published images support both architectures natively out of the box:
+- **`linux/arm64`**: Apple Silicon Mac (M1/M2/M3/M4) and ARM64 cloud servers.
+- **`linux/amd64`**: Windows Docker Desktop (WSL2) and standard Intel/AMD Linux servers.
+
+When pulling from Docker Hub, Docker automatically resolves and pulls the correct architecture slice without any emulation penalty.
+
+---
+
+### Automated CI/CD via GitHub Actions
+A dedicated multi-platform GitHub Actions workflow is provided at [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml).
+
+#### Prerequisites
+Configure two secrets in your GitHub repository (**Settings > Secrets and variables > Actions**):
+- `DOCKERHUB_USERNAME`: Your Docker Hub username or organization.
+- `DOCKERHUB_TOKEN`: Personal Access Token (PAT) with Read, Write, and Delete permissions.
+
+#### Triggers
+- **Push to `main`**: Automatically builds and publishes `:latest` and `:sha-<short-sha>` for both `linux/amd64` and `linux/arm64`.
+- **Git Tags**: Creating a tag (e.g. `git tag v2.0.0 && git push origin v2.0.0`) automatically publishes SemVer tags (`:2.0.0`, `:latest`).
+- **Manual Dispatch**: Go to **Actions > Build and Publish Multi-Platform Docker Images > Run workflow** to build custom tags (e.g., `staging`, `2.0.0`) or dry-run without pushing.
+
+---
+
+### Local CLI Build & Push
+To build both frontend and backend Docker images locally and push them to your Docker Hub repository:
 
 ```bash
 # Basic usage (defaults to tag: latest)
@@ -228,15 +252,19 @@ To build both frontend and backend Docker images and push them to your Docker Hu
 ```
 
 ### Run Anywhere from Docker Hub
-To run the platform on any server without cloning source code or installing compilers:
+To run the platform on any server or machine without cloning source code or installing compilers:
 
 ```bash
 # 1. Download the preconfigured compose file
-curl -O https://raw.githubusercontent.com/nalinkumar/e2e-orchestrator-platform/main/docker-compose.hub.yml
+curl -O https://raw.githubusercontent.com/Nikhil12894/e2e-orchestrator-platform/main/docker-compose.hub.yml
 
 # 2. Run with Docker Compose (pulls published images automatically)
-DOCKER_USERNAME=<your-dockerhub-username> TAG=latest docker compose -f docker-compose.hub.yml up -d
+docker compose -f docker-compose.hub.yml up -d
 ```
+The application will be live at:
+- Frontend Canvas: [http://localhost:3000](http://localhost:3000)
+- Backend Actuator Health: [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
+
 
 ---
 
