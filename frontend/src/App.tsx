@@ -424,6 +424,7 @@ export function App() {
     defaultHeaders: Record<string, string>;
     dynamicHeaders: Record<string, string>;
     envProperties: Record<string, Record<string, any>>;
+    envSecrets: Record<string, Record<string, string>>;
     secrets: Record<string, string>;
   }) => {
     if (!selectedWorkflow) return;
@@ -435,6 +436,7 @@ export function App() {
         defaultHeaders: settings.defaultHeaders,
         dynamicHeaders: settings.dynamicHeaders,
         envProperties: settings.envProperties,
+        envSecrets: settings.envSecrets,
         secrets: settings.secrets,
       },
     });
@@ -637,6 +639,10 @@ export function App() {
             ...(selectedWorkflow?.canvasState?.defaultHeaders || {}),
             ...(selectedWorkflow?.canvasState?.dynamicHeaders || {}),
           }}
+          envProperties={selectedWorkflow?.canvasState?.envProperties}
+          envSecrets={selectedWorkflow?.canvasState?.envSecrets}
+          secrets={selectedWorkflow?.canvasState?.secrets}
+          activeEnvironment={environment}
         />
       </div>
 

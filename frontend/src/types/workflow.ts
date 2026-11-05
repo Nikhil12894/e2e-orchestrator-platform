@@ -102,6 +102,7 @@ export interface WorkflowAst {
   defaultHeaders?: Record<string, string>;
   dynamicHeaders?: Record<string, string>;
   envProperties?: Record<string, Record<string, any>>;
+  envSecrets?: Record<string, Record<string, string>>;
   secrets?: Record<string, string>;
   timeoutMs?: number;
 }
@@ -171,6 +172,7 @@ export interface CanvasState {
   defaultHeaders?: Record<string, string>;
   dynamicHeaders?: Record<string, string>;
   envProperties?: Record<string, Record<string, any>>;
+  envSecrets?: Record<string, Record<string, string>>;
   secrets?: Record<string, string>;
 }
 

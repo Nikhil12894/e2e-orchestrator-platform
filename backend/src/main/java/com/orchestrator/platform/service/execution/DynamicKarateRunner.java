@@ -88,10 +88,24 @@ public class DynamicKarateRunner {
             mergedVariables.putAll(ast.getVariables());
         }
 
-        // 3. Secrets (Inject into context & register for redaction)
+        // 3. Secrets (Environment-Scoped & Global Fallback with Log Redaction)
+        Map<String, String> activeSecrets = new LinkedHashMap<>();
+        if (ast != null && ast.getEnvSecrets() != null && ast.getEnvSecrets().containsKey("default")) {
+            Map<String, String> defaultSec = ast.getEnvSecrets().get("default");
+            if (defaultSec != null) activeSecrets.putAll(defaultSec);
+        }
+        if (ast != null && ast.getEnvSecrets() != null && ast.getEnvSecrets().containsKey(selectedEnv)) {
+            Map<String, String> envSec = ast.getEnvSecrets().get(selectedEnv);
+            if (envSec != null) activeSecrets.putAll(envSec);
+        }
         if (ast != null && ast.getSecrets() != null && !ast.getSecrets().isEmpty()) {
-            mergedVariables.putAll(ast.getSecrets());
-            logBroadcaster.registerSecrets(executionId, ast.getSecrets().values());
+            activeSecrets.putAll(ast.getSecrets());
+        }
+
+        if (!activeSecrets.isEmpty()) {
+            mergedVariables.putAll(activeSecrets);
+            mergedVariables.put("secrets", activeSecrets);
+            logBroadcaster.registerSecrets(executionId, activeSecrets.values());
         }
 
         // 4. Trigger Request Initial Variables

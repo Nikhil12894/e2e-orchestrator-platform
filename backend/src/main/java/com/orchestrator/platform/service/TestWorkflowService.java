@@ -90,6 +90,9 @@ public class TestWorkflowService {
                 if (ast.getEnvProperties().isEmpty() && !request.getCanvasState().getEnvProperties().isEmpty()) {
                     ast.setEnvProperties(new LinkedHashMap<>(request.getCanvasState().getEnvProperties()));
                 }
+                if (ast.getEnvSecrets().isEmpty() && !request.getCanvasState().getEnvSecrets().isEmpty()) {
+                    ast.setEnvSecrets(new LinkedHashMap<>(request.getCanvasState().getEnvSecrets()));
+                }
                 if (ast.getSecrets().isEmpty() && !request.getCanvasState().getSecrets().isEmpty()) {
                     ast.setSecrets(new LinkedHashMap<>(request.getCanvasState().getSecrets()));
                 }
@@ -127,6 +130,9 @@ public class TestWorkflowService {
                 }
                 if (ast.getEnvProperties().isEmpty() && !request.getCanvasState().getEnvProperties().isEmpty()) {
                     ast.setEnvProperties(new LinkedHashMap<>(request.getCanvasState().getEnvProperties()));
+                }
+                if (ast.getEnvSecrets().isEmpty() && !request.getCanvasState().getEnvSecrets().isEmpty()) {
+                    ast.setEnvSecrets(new LinkedHashMap<>(request.getCanvasState().getEnvSecrets()));
                 }
                 if (ast.getSecrets().isEmpty() && !request.getCanvasState().getSecrets().isEmpty()) {
                     ast.setSecrets(new LinkedHashMap<>(request.getCanvasState().getSecrets()));
@@ -307,6 +313,7 @@ public class TestWorkflowService {
             if (canvasState.getDefaultHeaders() != null) ast.setDefaultHeaders(new LinkedHashMap<>(canvasState.getDefaultHeaders()));
             if (canvasState.getDynamicHeaders() != null) ast.setDynamicHeaders(new LinkedHashMap<>(canvasState.getDynamicHeaders()));
             if (canvasState.getEnvProperties() != null) ast.setEnvProperties(new LinkedHashMap<>(canvasState.getEnvProperties()));
+            if (canvasState.getEnvSecrets() != null) ast.setEnvSecrets(new LinkedHashMap<>(canvasState.getEnvSecrets()));
             if (canvasState.getSecrets() != null) ast.setSecrets(new LinkedHashMap<>(canvasState.getSecrets()));
             if (canvasState.getVariables() != null) ast.setVariables(new HashMap<>(canvasState.getVariables()));
         }

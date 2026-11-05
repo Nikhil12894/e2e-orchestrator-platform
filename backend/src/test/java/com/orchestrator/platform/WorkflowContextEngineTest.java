@@ -81,4 +81,30 @@ class WorkflowContextEngineTest {
         assertEquals("usr-100", body.get("owner"));
         assertEquals(true, body.get("active"));
     }
+
+    @Test
+    void testResolveEnvAndSecretPrefixes() {
+        Map<String, Object> context = new HashMap<>();
+        context.put("env", Map.of("DB_HOST", "db-prod.internal", "PORT", 5432));
+        context.put("secrets", Map.of("DB_PASS", "SuperVaultSecret99!", "API_KEY", "prod-key-77"));
+        context.put("STANDALONE_VAR", "standalone_value");
+
+        // Test $env: and env:
+        assertEquals("db-prod.internal", contextEngine.resolveString("${$env:DB_HOST}", context));
+        assertEquals("5432", contextEngine.resolveString("${env:PORT}", context));
+
+        // Test $secret: and secret:
+        assertEquals("SuperVaultSecret99!", contextEngine.resolveString("${$secret:DB_PASS}", context));
+        assertEquals("prod-key-77", contextEngine.resolveString("${secret:API_KEY}", context));
+
+        // Test standard dot notation and direct lookup
+        assertEquals("SuperVaultSecret99!", contextEngine.resolveString("${secrets.DB_PASS}", context));
+        assertEquals("db-prod.internal", contextEngine.resolveString("${env.DB_HOST}", context));
+        assertEquals("standalone_value", contextEngine.resolveString("${STANDALONE_VAR}", context));
+
+        // Complex embedded JDBC URL string resolution
+        String jdbcTemplate = "jdbc:postgresql://${$env:DB_HOST}:${env:PORT}/orders?password=${$secret:DB_PASS}";
+        assertEquals("jdbc:postgresql://db-prod.internal:5432/orders?password=SuperVaultSecret99!",
+                contextEngine.resolveString(jdbcTemplate, context));
+    }
 }

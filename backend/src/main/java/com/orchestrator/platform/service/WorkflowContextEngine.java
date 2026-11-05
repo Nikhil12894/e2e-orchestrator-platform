@@ -95,6 +95,29 @@ public class WorkflowContextEngine {
             return evaluatePropertyOrJsonPath(rootObj, parts[1]);
         }
 
+        // Support $env:KEY or env:KEY syntax
+        if (expression.startsWith("$env:") || expression.startsWith("env:")) {
+            String envKey = expression.substring(expression.indexOf(':') + 1).trim();
+            if (context.get("env") instanceof Map<?, ?> envMap && envMap.containsKey(envKey)) {
+                return envMap.get(envKey);
+            }
+            if (context.containsKey(envKey)) {
+                return context.get(envKey);
+            }
+            return System.getenv(envKey);
+        }
+
+        // Support $secret:KEY or secret:KEY syntax
+        if (expression.startsWith("$secret:") || expression.startsWith("secret:")) {
+            String secKey = expression.substring(expression.indexOf(':') + 1).trim();
+            if (context.get("secrets") instanceof Map<?, ?> secMap && secMap.containsKey(secKey)) {
+                return secMap.get(secKey);
+            }
+            if (context.containsKey(secKey)) {
+                return context.get(secKey);
+            }
+        }
+
         // Check if expression is a JSONPath against the root context
         if (expression.startsWith("$")) {
             try {

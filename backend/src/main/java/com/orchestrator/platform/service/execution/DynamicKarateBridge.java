@@ -176,6 +176,22 @@ public class DynamicKarateBridge {
         try {
             Object configObj = step.get("dbPollConfig");
             DbPollStepConfig config = instance.objectMapper.convertValue(configObj, DbPollStepConfig.class);
+
+            // Resilient variable interpolation safeguard for DB connections
+            Map<String, Object> ctx = activeContexts.getOrDefault(executionId, Collections.emptyMap());
+            if (config.getJdbcUrl() != null && config.getJdbcUrl().contains("${")) {
+                config.setJdbcUrl(instance.contextEngine.resolveString(config.getJdbcUrl(), ctx));
+            }
+            if (config.getUsername() != null && config.getUsername().contains("${")) {
+                config.setUsername(instance.contextEngine.resolveString(config.getUsername(), ctx));
+            }
+            if (config.getPassword() != null && config.getPassword().contains("${")) {
+                config.setPassword(instance.contextEngine.resolveString(config.getPassword(), ctx));
+            }
+            if (config.getQuery() != null && config.getQuery().contains("${")) {
+                config.setQuery(instance.contextEngine.resolveString(config.getQuery(), ctx));
+            }
+
             DbPollExecutor.DbPollResult result = instance.dbPollExecutor.execute(config);
 
             Map<String, Object> resMap = new HashMap<>();

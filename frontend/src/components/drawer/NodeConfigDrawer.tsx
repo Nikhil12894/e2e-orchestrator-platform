@@ -33,6 +33,10 @@ interface NodeConfigDrawerProps {
   edges?: Array<{ id: string; source: string; target: string }>;
   onDeleteEdge?: (edgeId: string) => void;
   workflowHeaders?: Record<string, string>;
+  envProperties?: Record<string, Record<string, any>>;
+  envSecrets?: Record<string, Record<string, string>>;
+  secrets?: Record<string, string>;
+  activeEnvironment?: string;
 }
 
 export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
@@ -44,6 +48,10 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
   edges = [],
   onDeleteEdge,
   workflowHeaders = {},
+  envProperties = {},
+  envSecrets = {},
+  secrets = {},
+  activeEnvironment = 'default',
 }) => {
   const [activeTab, setActiveTab] = useState<'config' | 'extractions' | 'assertions'>('config');
   const [isVarModalOpen, setIsVarModalOpen] = useState(false);
@@ -142,11 +150,25 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
     setIsVarModalOpen(true);
   };
 
+  const currentEnv = activeEnvironment || 'default';
+  const currentEnvVarsMap = envProperties[currentEnv] || {};
+  const currentSecretsMap: Record<string, string> = {
+    ...secrets,
+    ...(envSecrets['default'] || {}),
+    ...(envSecrets[currentEnv] || {}),
+  };
+
   const handleInsertVariable = (varExpr: string) => {
     if (!varTargetField) return;
 
     if (varTargetField === 'url') {
       update({ url: (data.url || '') + varExpr });
+    } else if (varTargetField === 'jdbcUrl') {
+      update({ jdbcUrl: (data.jdbcUrl || '') + varExpr });
+    } else if (varTargetField === 'username') {
+      update({ username: (data.username || '') + varExpr });
+    } else if (varTargetField === 'password') {
+      update({ password: (data.password || '') + varExpr });
     } else if (varTargetField === 'query') {
       update({ query: (data.query || '') + varExpr });
     } else if (varTargetField === 'condition') {
@@ -706,29 +728,107 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="text-[11px] font-medium text-slate-300">JDBC URL</label>
-                      <span className="text-[10px] text-slate-500 font-mono">
-                        {(data.jdbcUrl?.includes('oracle') || data.driverClassName?.includes('oracle')) ? 'Oracle ojdbc17' : 'Auto-detected'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          {(data.jdbcUrl?.includes('oracle') || data.driverClassName?.includes('oracle')) ? 'Oracle ojdbc17' : 'Auto-detected'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => openVarSelector('jdbcUrl')}
+                          className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-0.5"
+                          title="Insert Env Variable / Secret"
+                        >
+                          <Variable className="w-2.5 h-2.5" />
+                          Var / Env
+                        </button>
+                      </div>
                     </div>
+
+                    {(Object.keys(currentEnvVarsMap).length > 0 || Object.keys(currentSecretsMap).length > 0) && (
+                      <div className="mb-1.5">
+                        <select
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              update({ jdbcUrl: e.target.value });
+                              e.target.value = '';
+                            }
+                          }}
+                          defaultValue=""
+                          className="w-full text-[11px] py-1 px-2 bg-slate-900 border border-slate-800 rounded-lg text-slate-300 focus:outline-none focus:border-amber-500 cursor-pointer"
+                        >
+                          <option value="" disabled>⚡ Quick Select URL from Env / Secrets...</option>
+                          {Object.keys(currentEnvVarsMap).length > 0 && (
+                            <optgroup label="Environment Variables">
+                              {Object.keys(currentEnvVarsMap).map((k) => (
+                                <option key={k} value={`\${${k}}`}>
+                                  🌐 {k} ({`\${${k}}`})
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {Object.keys(currentSecretsMap).length > 0 && (
+                            <optgroup label="Secrets">
+                              {Object.keys(currentSecretsMap).map((k) => (
+                                <option key={k} value={`\${${k}}`}>
+                                  🔒 {k} ({`\${${k}}`})
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                        </select>
+                      </div>
+                    )}
+
                     <input
                       type="text"
                       value={data.jdbcUrl || ''}
                       onChange={(e) => update({ jdbcUrl: e.target.value })}
-                      placeholder="jdbc:oracle:thin:@//localhost:1521/XEPDB1 or jdbc:postgresql://localhost:5432/db"
+                      placeholder="jdbc:oracle:thin:@//localhost:1521/XEPDB1 or ${DB_URL}"
                       className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-[11px] font-medium text-slate-300 mb-1">DB Username</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-medium text-slate-300">DB Username</label>
+                        <button
+                          type="button"
+                          onClick={() => openVarSelector('username')}
+                          className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-0.5"
+                          title="Insert Secret / Variable"
+                        >
+                          <Variable className="w-2.5 h-2.5" />
+                          Var
+                        </button>
+                      </div>
                       <input
                         type="text"
                         value={data.username || ''}
                         onChange={(e) => update({ username: e.target.value })}
-                        placeholder="postgres / system"
+                        placeholder="postgres / ${DB_USER}"
                         className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500"
                       />
+                      {(Object.keys(currentEnvVarsMap).length > 0 || Object.keys(currentSecretsMap).length > 0) && (
+                        <select
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              update({ username: e.target.value });
+                              e.target.value = '';
+                            }
+                          }}
+                          defaultValue=""
+                          className="w-full text-[10px] py-1 px-1.5 bg-slate-900 border border-slate-800 rounded text-slate-400 focus:outline-none cursor-pointer mt-1"
+                        >
+                          <option value="" disabled>⚡ Bind Username...</option>
+                          {Object.keys(currentEnvVarsMap).map((k) => (
+                            <option key={k} value={`\${${k}}`}>🌐 {k}</option>
+                          ))}
+                          {Object.keys(currentSecretsMap).map((k) => (
+                            <option key={k} value={`\${${k}}`}>🔒 {k}</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
@@ -747,9 +847,26 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                         type="password"
                         value={data.password || ''}
                         onChange={(e) => update({ password: e.target.value })}
-                        placeholder="${secrets.DB_PASS}"
+                        placeholder="${DB_PASS}"
                         className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500"
                       />
+                      {Object.keys(currentSecretsMap).length > 0 && (
+                        <select
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              update({ password: e.target.value });
+                              e.target.value = '';
+                            }
+                          }}
+                          defaultValue=""
+                          className="w-full text-[10px] py-1 px-1.5 bg-slate-900 border border-slate-800 rounded text-slate-400 focus:outline-none cursor-pointer mt-1"
+                        >
+                          <option value="" disabled>⚡ Bind Secret...</option>
+                          {Object.keys(currentSecretsMap).map((k) => (
+                            <option key={k} value={`\${${k}}`}>🔒 {k}</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   </div>
 
@@ -1170,6 +1287,10 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
             onSelectVariable={handleInsertVariable}
             availableNodes={allNodes}
             currentNodeId={selectedNode.id}
+            envProperties={envProperties}
+            envSecrets={envSecrets}
+            secrets={secrets}
+            activeEnvironment={activeEnvironment}
           />
         </Suspense>
       )}

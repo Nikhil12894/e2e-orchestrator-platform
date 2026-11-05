@@ -14,6 +14,7 @@ public class CanvasState implements Serializable {
     private Map<String, String> defaultHeaders = new LinkedHashMap<>();
     private Map<String, String> dynamicHeaders = new LinkedHashMap<>();
     private Map<String, Map<String, Object>> envProperties = new LinkedHashMap<>();
+    private Map<String, Map<String, String>> envSecrets = new LinkedHashMap<>();
     private Map<String, String> secrets = new LinkedHashMap<>();
     private Map<String, Object> variables = new HashMap<>();
 
@@ -36,6 +37,9 @@ public class CanvasState implements Serializable {
 
     public Map<String, Map<String, Object>> getEnvProperties() { return envProperties; }
     public void setEnvProperties(Map<String, Map<String, Object>> envProperties) { this.envProperties = envProperties; }
+
+    public Map<String, Map<String, String>> getEnvSecrets() { return envSecrets; }
+    public void setEnvSecrets(Map<String, Map<String, String>> envSecrets) { this.envSecrets = envSecrets; }
 
     public Map<String, String> getSecrets() { return secrets; }
     public void setSecrets(Map<String, String> secrets) { this.secrets = secrets; }

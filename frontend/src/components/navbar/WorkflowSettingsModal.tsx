@@ -26,6 +26,7 @@ interface WorkflowSettingsModalProps {
     defaultHeaders: Record<string, string>;
     dynamicHeaders: Record<string, string>;
     envProperties: Record<string, Record<string, any>>;
+    envSecrets: Record<string, Record<string, string>>;
     secrets: Record<string, string>;
   }) => void;
   onDeleteWorkflow?: (workflowId: string) => void;
@@ -58,9 +59,14 @@ export const WorkflowSettingsModal: React.FC<WorkflowSettingsModalProps> = ({
     production: [],
   });
 
-  // Secrets key-value list & visibility map
-  const [secretsList, setSecretsList] = useState<Array<{ key: string; value: string }>>([]);
-  const [revealedSecrets, setRevealedSecrets] = useState<Record<number, boolean>>({});
+  // Secrets per-environment
+  const [selectedSecretEnv, setSelectedSecretEnv] = useState<'default' | 'staging' | 'production'>('default');
+  const [envSecretsMap, setEnvSecretsMap] = useState<Record<string, Array<{ key: string; value: string }>>>({
+    default: [],
+    staging: [],
+    production: [],
+  });
+  const [revealedSecrets, setRevealedSecrets] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!workflow) return;
@@ -89,9 +95,22 @@ export const WorkflowSettingsModal: React.FC<WorkflowSettingsModalProps> = ({
     }
     setEnvPropertiesMap(parsedEnv);
 
-    // Secrets
-    const sec = workflow.canvasState?.secrets || workflow.workflowAst?.secrets || {};
-    setSecretsList(Object.entries(sec).map(([key, value]) => ({ key, value })));
+    // Env Secrets (with fallback to legacy flat secrets)
+    const envSec = workflow.canvasState?.envSecrets || workflow.workflowAst?.envSecrets || {};
+    const parsedEnvSec: Record<string, Array<{ key: string; value: string }>> = {
+      default: [],
+      staging: [],
+      production: [],
+    };
+    for (const envKey of ['default', 'staging', 'production']) {
+      const vals = envSec[envKey] || {};
+      parsedEnvSec[envKey] = Object.entries(vals).map(([k, v]) => ({ key: k, value: String(v) }));
+    }
+    const legacySec = workflow.canvasState?.secrets || workflow.workflowAst?.secrets || {};
+    if (parsedEnvSec.default.length === 0 && Object.keys(legacySec).length > 0) {
+      parsedEnvSec.default = Object.entries(legacySec).map(([k, v]) => ({ key: k, value: String(v) }));
+    }
+    setEnvSecretsMap(parsedEnvSec);
     setRevealedSecrets({});
   }, [workflow, isOpen]);
 
@@ -122,10 +141,22 @@ export const WorkflowSettingsModal: React.FC<WorkflowSettingsModalProps> = ({
       envProperties[env] = map;
     }
 
-    const secrets: Record<string, string> = {};
-    for (const item of secretsList) {
-      if (item.key.trim()) secrets[item.key.trim()] = item.value;
+    const envSecrets: Record<string, Record<string, string>> = {};
+    for (const [env, items] of Object.entries(envSecretsMap)) {
+      const map: Record<string, string> = {};
+      for (const item of items) {
+        if (item.key.trim()) {
+          map[item.key.trim()] = item.value;
+        }
+      }
+      envSecrets[env] = map;
     }
+
+    // Flattened secrets for legacy compatibility
+    const secrets: Record<string, string> = {
+      ...(envSecrets['default'] || {}),
+      ...(envSecrets[selectedSecretEnv] || {}),
+    };
 
     onSaveSettings({
       name: name.trim() || workflow.name,
@@ -133,6 +164,7 @@ export const WorkflowSettingsModal: React.FC<WorkflowSettingsModalProps> = ({
       defaultHeaders,
       dynamicHeaders,
       envProperties,
+      envSecrets,
       secrets,
     });
     onClose();
@@ -236,9 +268,9 @@ export const WorkflowSettingsModal: React.FC<WorkflowSettingsModalProps> = ({
           >
             <Lock className="w-3.5 h-3.5" />
             Secrets
-            {secretsList.length > 0 && (
+            {Object.values(envSecretsMap).reduce((acc, curr) => acc + curr.length, 0) > 0 && (
               <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-rose-500/20 text-rose-400 font-mono">
-                {secretsList.length}
+                {Object.values(envSecretsMap).reduce((acc, curr) => acc + curr.length, 0)}
               </span>
             )}
           </button>
@@ -662,34 +694,68 @@ export const WorkflowSettingsModal: React.FC<WorkflowSettingsModalProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-medium text-slate-200">Secrets Management</h4>
+                  <h4 className="text-xs font-medium text-slate-200">Environment-Scoped Secrets Management</h4>
                   <p className="text-[11px] text-slate-400">
-                    Sensitive tokens and passwords. Redacted as [REDACTED] in logs, console, and HTML reports.
+                    Sensitive tokens and database credentials configured per environment. Scrubbed as [REDACTED] in logs and reports.
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setSecretsList((prev) => [...prev, { key: '', value: '' }])}
+                  onClick={() =>
+                    setEnvSecretsMap((prev) => ({
+                      ...prev,
+                      [selectedSecretEnv]: [...(prev[selectedSecretEnv] || []), { key: '', value: '' }],
+                    }))
+                  }
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 border border-rose-500/20 text-xs font-medium transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  Add Secret
+                  Add Secret ({selectedSecretEnv})
                 </button>
+              </div>
+
+              {/* Environment Switcher */}
+              <div className="flex items-center gap-1.5 p-1 bg-slate-950/40 border border-slate-800 rounded-lg">
+                {(['default', 'staging', 'production'] as const).map((env) => {
+                  const count = (envSecretsMap[env] || []).length;
+                  return (
+                    <button
+                      key={env}
+                      type="button"
+                      onClick={() => setSelectedSecretEnv(env)}
+                      className={`flex-1 py-1.5 px-3 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-2 ${
+                        selectedSecretEnv === env
+                          ? 'bg-rose-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <span className="capitalize">{env}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                          selectedSecretEnv === env ? 'bg-rose-700 text-white' : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg flex items-start gap-2.5">
                 <Lock className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
                 <div className="text-[11px] text-rose-200 leading-relaxed">
                   <span className="font-semibold text-rose-300">Automatic Log Redaction Active: </span>
-                  Any secret value registered here will never leak in plaintext. MeterFlow automatically sanitizes
-                  live console outputs and Karate execution summaries. Reference them via{' '}
-                  <code className="text-rose-300 font-mono">{'${secretName}'}</code>.
+                  Secrets in <code className="text-rose-300 font-mono">{selectedSecretEnv}</code> will never leak in plaintext.
+                  Secrets defined here override <code className="text-rose-300 font-mono">default</code> secrets when executing in this environment.
+                  Reference via <code className="text-rose-300 font-mono">{'${secretName}'}</code> or <code className="text-rose-300 font-mono">{'${$secret:secretName}'}</code>.
                 </div>
               </div>
 
-              {secretsList.length === 0 ? (
+              {(envSecretsMap[selectedSecretEnv] || []).length === 0 ? (
                 <div className="p-8 text-center border border-dashed border-slate-800 rounded-lg bg-slate-950/30">
-                  <p className="text-xs text-slate-500">No secrets configured for this workflow.</p>
+                  <p className="text-xs text-slate-500">No secrets configured for {selectedSecretEnv} environment.</p>
+                  <p className="text-[11px] text-slate-600 mt-1">If not defined here, MeterFlow will inherit secrets from "default".</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -698,62 +764,74 @@ export const WorkflowSettingsModal: React.FC<WorkflowSettingsModalProps> = ({
                     <span className="col-span-6">Secret Value</span>
                     <span className="col-span-1 text-right">Action</span>
                   </div>
-                  {secretsList.map((item, idx) => (
-                    <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                      <div className="col-span-5">
-                        <input
-                          type="text"
-                          value={item.key}
-                          placeholder="e.g. apiKey, clientSecret"
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setSecretsList((prev) =>
-                              prev.map((s, i) => (i === idx ? { ...s, key: val } : s))
-                            );
-                          }}
-                          className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-rose-500"
-                        />
+                  {envSecretsMap[selectedSecretEnv].map((item, idx) => {
+                    const secretKeyId = `${selectedSecretEnv}_${idx}`;
+                    return (
+                      <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                        <div className="col-span-5">
+                          <input
+                            type="text"
+                            value={item.key}
+                            placeholder="e.g. DB_PASSWORD, apiKey"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEnvSecretsMap((prev) => ({
+                                ...prev,
+                                [selectedSecretEnv]: prev[selectedSecretEnv].map((s, i) =>
+                                  i === idx ? { ...s, key: val } : s
+                                ),
+                              }));
+                            }}
+                            className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-rose-500"
+                          />
+                        </div>
+                        <div className="col-span-6 relative">
+                          <input
+                            type={revealedSecrets[secretKeyId] ? 'text' : 'password'}
+                            value={item.value}
+                            placeholder="••••••••"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setEnvSecretsMap((prev) => ({
+                                ...prev,
+                                [selectedSecretEnv]: prev[selectedSecretEnv].map((s, i) =>
+                                  i === idx ? { ...s, value: val } : s
+                                ),
+                              }));
+                            }}
+                            className="w-full pr-8 px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-rose-300 focus:outline-none focus:border-rose-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setRevealedSecrets((prev) => ({ ...prev, [secretKeyId]: !prev[secretKeyId] }))
+                            }
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                          >
+                            {revealedSecrets[secretKeyId] ? (
+                              <EyeOff className="w-3.5 h-3.5" />
+                            ) : (
+                              <Eye className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                        <div className="col-span-1 text-right">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEnvSecretsMap((prev) => ({
+                                ...prev,
+                                [selectedSecretEnv]: prev[selectedSecretEnv].filter((_, i) => i !== idx),
+                              }))
+                            }
+                            className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="col-span-6 relative">
-                        <input
-                          type={revealedSecrets[idx] ? 'text' : 'password'}
-                          value={item.value}
-                          placeholder="••••••••"
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setSecretsList((prev) =>
-                              prev.map((s, i) => (i === idx ? { ...s, value: val } : s))
-                            );
-                          }}
-                          className="w-full pr-8 px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-rose-300 focus:outline-none focus:border-rose-500"
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setRevealedSecrets((prev) => ({ ...prev, [idx]: !prev[idx] }))
-                          }
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-                        >
-                          {revealedSecrets[idx] ? (
-                            <EyeOff className="w-3.5 h-3.5" />
-                          ) : (
-                            <Eye className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                      </div>
-                      <div className="col-span-1 text-right">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSecretsList((prev) => prev.filter((_, i) => i !== idx))
-                          }
-                          className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

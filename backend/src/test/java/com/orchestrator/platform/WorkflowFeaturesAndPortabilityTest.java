@@ -18,7 +18,9 @@ import com.orchestrator.platform.repository.TestWorkflowRepository;
 import com.orchestrator.platform.repository.WorkflowExecutionRepository;
 import com.orchestrator.platform.service.TestWorkflowExecutionService;
 import com.orchestrator.platform.service.TestWorkflowService;
+import com.orchestrator.platform.service.WorkflowContextEngine;
 import com.orchestrator.platform.service.execution.DynamicKarateRunner;
+import com.orchestrator.platform.service.execution.ExecutionLogBroadcaster;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,6 +54,12 @@ public class WorkflowFeaturesAndPortabilityTest {
 
     @Autowired
     private DynamicKarateRunner karateRunner;
+
+    @Autowired
+    private ExecutionLogBroadcaster logBroadcaster;
+
+    @Autowired
+    private WorkflowContextEngine contextEngine;
 
     @Test
     @DisplayName("Verify Standalone Karate .feature export generation")
@@ -287,5 +295,73 @@ public class WorkflowFeaturesAndPortabilityTest {
         Path reportDir = karateRunner.getReportDir(finished.getId());
         assertNotNull(reportDir);
         assertTrue(java.nio.file.Files.exists(reportDir));
+    }
+
+    @Test
+    void testEnvironmentScopedSecretsAndDbPollVariableResolution() {
+        // 1. Create Workflow with envProperties and envSecrets
+        TestWorkflowEntity wf = new TestWorkflowEntity();
+        wf.setName("Env Secrets & DB Var Test Flow");
+        wf.setStatus("ACTIVE");
+
+        WorkflowAst ast = new WorkflowAst();
+        // Env properties
+        Map<String, Map<String, Object>> envProperties = new LinkedHashMap<>();
+        envProperties.put("default", Map.of("DB_HOST", "localhost", "DB_NAME", "dev_db"));
+        envProperties.put("staging", Map.of("DB_HOST", "stg-db.internal", "DB_NAME", "stg_orders"));
+        ast.setEnvProperties(envProperties);
+
+        // Env secrets
+        Map<String, Map<String, String>> envSecrets = new LinkedHashMap<>();
+        envSecrets.put("default", Map.of("DB_PASS", "dev-pass-123", "SHARED_KEY", "shared-base-token"));
+        envSecrets.put("staging", Map.of("DB_PASS", "stg-vault-secret-999"));
+        ast.setEnvSecrets(envSecrets);
+
+        // Add a delay step so workflow executes cleanly without requiring live remote Postgres
+        WorkflowStep step = new WorkflowStep();
+        step.setId("step_test");
+        step.setName("Verify Env Secret Injection");
+        step.setType(StepType.DELAY);
+        step.setDelayMs(50L);
+        step.setEnabled(true);
+        ast.setSteps(List.of(step));
+
+        wf.setWorkflowAst(ast);
+        wf = workflowRepository.saveAndFlush(wf);
+
+        // 2. Execute under 'staging' environment
+        WorkflowExecutionEntity exec = new WorkflowExecutionEntity();
+        exec.setWorkflowId(wf.getId());
+        exec.setWorkflowName(wf.getName());
+        exec.setStatus(ExecutionStatus.PENDING);
+        exec = executionRepository.saveAndFlush(exec);
+
+        WorkflowExecutionEntity finished = karateRunner.executeWorkflow(exec, wf, new HashMap<>(), "staging");
+        assertEquals(ExecutionStatus.COMPLETED, finished.getStatus());
+
+        Map<String, Object> snapshot = finished.getContextSnapshot();
+        assertNotNull(snapshot);
+
+        // Verify staging envProperties took effect
+        assertEquals("stg-db.internal", snapshot.get("DB_HOST"));
+        assertEquals("stg_orders", snapshot.get("DB_NAME"));
+
+        // Verify staging envSecrets overridden default DB_PASS
+        assertEquals("stg-vault-secret-999", snapshot.get("DB_PASS"));
+
+        // Verify SHARED_KEY was inherited from default envSecrets
+        assertEquals("shared-base-token", snapshot.get("SHARED_KEY"));
+
+        // Verify logBroadcaster masks staging secret and inherited secret
+        String rawLog = "Connecting to stg-db.internal with pass stg-vault-secret-999 and token shared-base-token";
+        String maskedLog = logBroadcaster.maskSecrets(finished.getId(), rawLog);
+        assertEquals("Connecting to stg-db.internal with pass [REDACTED] and token [REDACTED]", maskedLog);
+
+        // Verify ContextEngine resolves DB JDBC URL string with env and secret prefixes
+        String resolvedJdbcUrl = contextEngine.resolveString(
+                "jdbc:postgresql://${$env:DB_HOST}:5432/${$env:DB_NAME}?password=${$secret:DB_PASS}",
+                snapshot
+        );
+        assertEquals("jdbc:postgresql://stg-db.internal:5432/stg_orders?password=stg-vault-secret-999", resolvedJdbcUrl);
     }
 }
