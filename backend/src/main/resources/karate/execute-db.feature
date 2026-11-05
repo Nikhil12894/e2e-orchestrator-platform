@@ -9,8 +9,11 @@ Feature: Execute Database SQL Poll Step
     * def isMatched = pollResult.matched
     * def latestRow = pollResult.latestRow || {}
 
+    # Build composite payload with row, latestRow, rows, and columns for rich extraction
+    * def dbPayload = karate.merge(latestRow, { row: latestRow, latestRow: latestRow, rows: pollResult.rows, attempts: pollResult.attempts, matched: isMatched })
+
     # Extract any variables from the matched DB row
-    * def extractedVars = Bridge.extractVariables(executionId, resolvedStep, latestRow, 200, {})
+    * def extractedVars = Bridge.extractVariables(executionId, resolvedStep, dbPayload, 200, {})
 
     # Karate Assertion
     * match isMatched == true

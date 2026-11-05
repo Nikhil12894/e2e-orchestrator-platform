@@ -240,12 +240,14 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
   };
 
   // Extractions handler
+  const isDbNode = nodeType === 'dbPoll' || data.type === 'DB_POLL';
+
   const addExtraction = () => {
     const list: VariableExtraction[] = [...(data.extractions || [])];
     list.push({
-      variableName: `var_${list.length + 1}`,
-      source: 'RESPONSE_BODY',
-      jsonPath: '$.id',
+      variableName: isDbNode ? `db_var_${list.length + 1}` : `var_${list.length + 1}`,
+      source: isDbNode ? 'DB_ROW_COLUMN' : 'RESPONSE_BODY',
+      jsonPath: isDbNode ? 'STATUS' : '$.id',
       defaultValue: '',
     });
     update({ extractions: list });
@@ -1333,7 +1335,18 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
           {activeTab === 'extractions' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-400">Extract fields into runtime variables</span>
+                <div>
+                  <span className="text-xs text-slate-400">
+                    {isDbNode
+                      ? 'Extract column values from the matched DB row into runtime variables'
+                      : 'Extract fields into runtime variables'}
+                  </span>
+                  {isDbNode && (
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      Case-insensitive column lookup. Matches <code className="text-amber-400">STATUS</code>, <code className="text-amber-400">row.STATUS</code>, or <code className="text-amber-400">$.STATUS</code>.
+                    </p>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={addExtraction}
@@ -1359,7 +1372,7 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                       type="text"
                       value={ex.variableName}
                       onChange={(e) => updateExtraction(i, { variableName: e.target.value })}
-                      placeholder="e.g. authToken"
+                      placeholder={isDbNode ? "e.g. orderStatus or refId" : "e.g. authToken"}
                       className="w-full px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs font-mono text-emerald-400 focus:outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -1372,19 +1385,30 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                         onChange={(e) => updateExtraction(i, { source: e.target.value as any })}
                         className="w-full px-2 py-1 bg-slate-900 border border-slate-800 rounded text-[11px] text-slate-200 focus:outline-none"
                       >
-                        <option value="RESPONSE_BODY">Response Body</option>
-                        <option value="RESPONSE_HEADER">Header</option>
-                        <option value="RESPONSE_STATUS">Status</option>
-                        <option value="DB_ROW_COLUMN">DB Column</option>
+                        {isDbNode ? (
+                          <>
+                            <option value="DB_ROW_COLUMN">DB Row Column</option>
+                            <option value="RESPONSE_BODY">Full DB Response / JSONPath</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="RESPONSE_BODY">Response Body</option>
+                            <option value="RESPONSE_HEADER">Header</option>
+                            <option value="RESPONSE_STATUS">Status</option>
+                            <option value="DB_ROW_COLUMN">DB Column</option>
+                          </>
+                        )}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[10px] text-slate-400 mb-0.5">JSONPath</label>
+                      <label className="block text-[10px] text-slate-400 mb-0.5">
+                        {isDbNode ? 'Column Name / JSONPath' : 'JSONPath'}
+                      </label>
                       <input
                         type="text"
                         value={ex.jsonPath}
                         onChange={(e) => updateExtraction(i, { jsonPath: e.target.value })}
-                        placeholder="$.data.token"
+                        placeholder={isDbNode ? "e.g. STATUS, REF_ID, or row.STATUS" : "$.data.token"}
                         className="w-full px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs font-mono text-slate-200 focus:outline-none"
                       />
                     </div>

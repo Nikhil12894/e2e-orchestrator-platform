@@ -304,6 +304,7 @@ public class DynamicKarateBridge {
 
         List<Map<String, Object>> extractions = (List<Map<String, Object>>) extractionsObj;
         Map<String, Object> context = activeContexts.computeIfAbsent(executionId, k -> new ConcurrentHashMap<>());
+        boolean isDbStep = "DB_POLL".equalsIgnoreCase(String.valueOf(step.get("type")));
 
         for (Map<String, Object> ext : extractions) {
             String varName = (String) ext.get("variableName");
@@ -316,8 +317,14 @@ public class DynamicKarateBridge {
                 value = httpStatus;
             } else if ("RESPONSE_HEADER".equalsIgnoreCase(source) && headers != null) {
                 value = headers.get(jsonPath);
+            } else if ("DB_ROW_COLUMN".equalsIgnoreCase(source) || "DB_COLUMN".equalsIgnoreCase(source)) {
+                value = extractDbOrMapValue(responseBody, jsonPath);
             } else if (responseBody != null) {
-                value = instance.contextEngine.evaluateJsonPath(responseBody, jsonPath);
+                if (isDbStep || responseBody instanceof Map) {
+                    value = extractDbOrMapValue(responseBody, jsonPath);
+                } else {
+                    value = instance.contextEngine.evaluateJsonPath(responseBody, jsonPath);
+                }
             }
 
             if (value == null && defaultValue != null) {
@@ -351,6 +358,105 @@ public class DynamicKarateBridge {
         }
 
         return extracted;
+    }
+
+    public static Object extractDbOrMapValue(Object responseBody, String jsonPath) {
+        if (responseBody == null || jsonPath == null || jsonPath.isBlank()) {
+            return null;
+        }
+
+        // 1. Try direct JSONPath evaluation first (preserving Jayway JSONPath behavior)
+        if (instance != null && instance.contextEngine != null) {
+            try {
+                Object directVal = instance.contextEngine.evaluateJsonPath(responseBody, jsonPath);
+                if (directVal != null) {
+                    return directVal;
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // 2. Strip leading prefixes: $, $., row., latestRow.
+        String cleanPath = jsonPath.trim();
+        if (cleanPath.startsWith("$.")) {
+            cleanPath = cleanPath.substring(2);
+        } else if (cleanPath.startsWith("$")) {
+            cleanPath = cleanPath.substring(1);
+        }
+        if (cleanPath.startsWith("row.")) {
+            cleanPath = cleanPath.substring(4);
+        } else if (cleanPath.startsWith("latestRow.")) {
+            cleanPath = cleanPath.substring(10);
+        }
+
+        // 3. Direct / Case-insensitive / Underscore-insensitive lookup in Map
+        if (responseBody instanceof Map<?, ?> map) {
+            Object val = findInMapCaseInsensitive(map, cleanPath);
+            if (val != null) return val;
+
+            // Check if map contains nested "row" or "latestRow"
+            if (map.get("row") instanceof Map<?, ?> rowMap) {
+                val = findInMapCaseInsensitive(rowMap, cleanPath);
+                if (val != null) return val;
+            }
+            if (map.get("latestRow") instanceof Map<?, ?> latestMap) {
+                val = findInMapCaseInsensitive(latestMap, cleanPath);
+                if (val != null) return val;
+            }
+
+            // Check if map contains "rows" list
+            if (map.get("rows") instanceof List<?> rowsList && !rowsList.isEmpty()) {
+                Object firstRow = rowsList.get(0);
+                if (firstRow instanceof Map<?, ?> firstRowMap) {
+                    val = findInMapCaseInsensitive(firstRowMap, cleanPath);
+                    if (val != null) return val;
+                }
+            }
+        }
+
+        // 4. Try JSONPath with "$." prefix if not present
+        if (instance != null && instance.contextEngine != null) {
+            if (!jsonPath.startsWith("$")) {
+                try {
+                    Object val = instance.contextEngine.evaluateJsonPath(responseBody, "$." + jsonPath);
+                    if (val != null) return val;
+                } catch (Exception ignored) {}
+            }
+            try {
+                Object val = instance.contextEngine.evaluateJsonPath(responseBody, "$.row." + cleanPath);
+                if (val != null) return val;
+            } catch (Exception ignored) {}
+        }
+
+        return null;
+    }
+
+    public static Object findInMapCaseInsensitive(Map<?, ?> map, String targetKey) {
+        if (map == null || targetKey == null || targetKey.isBlank()) return null;
+
+        // A. Direct exact match
+        if (map.containsKey(targetKey)) {
+            return map.get(targetKey);
+        }
+
+        // B. Case-insensitive match (e.g. "status" matches "STATUS")
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            if (entry.getKey() != null && entry.getKey().toString().equalsIgnoreCase(targetKey)) {
+                return entry.getValue();
+            }
+        }
+
+        // C. Underscore-insensitive & case-insensitive match (e.g. "refId" or "ref_id" matches "REF_ID")
+        String normalizedTarget = targetKey.replace("_", "").toLowerCase();
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            if (entry.getKey() != null) {
+                String normalizedKey = entry.getKey().toString().replace("_", "").toLowerCase();
+                if (normalizedKey.equals(normalizedTarget)) {
+                    return entry.getValue();
+                }
+            }
+        }
+
+        return null;
     }
 
     @SuppressWarnings("unchecked")

@@ -9,8 +9,10 @@ import com.orchestrator.platform.domain.enums.StepType;
 import com.orchestrator.platform.domain.model.ast.DbPollStepConfig;
 import com.orchestrator.platform.domain.model.dto.DbConnectionTestResult;
 import com.orchestrator.platform.domain.model.dto.ExecutionStepResult;
+import com.orchestrator.platform.service.WorkflowContextEngine;
 import com.orchestrator.platform.service.execution.DbPollExecutor;
 import com.orchestrator.platform.service.execution.DynamicKarateBridge;
+import com.orchestrator.platform.service.execution.ExecutionLogBroadcaster;
 import com.orchestrator.platform.service.execution.WorkflowReportGenerator;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -329,5 +331,129 @@ public class DbExecutorAndReportExclusionTest {
         assertFalse(res.isSuccess(), "Connection with wrong password should fail");
         assertNotNull(res.getErrorMessage());
         assertTrue(res.getErrorMessage().length() > 0);
+    }
+
+    @Test
+    @DisplayName("Verify DB Poll variable extraction handles case insensitivity, camelCase/snake_case, and row prefixes")
+    public void testDbPollVariableExtractionCaseInsensitiveAndPrefixes() {
+        Map<String, Object> oracleRow = new LinkedHashMap<>();
+        oracleRow.put("REF_ID", "SR_2026113091911889_0452");
+        oracleRow.put("STATUS", "COMPLETED");
+        oracleRow.put("ORDER_ID", 101);
+        oracleRow.put("TOTAL_AMOUNT", 199.98);
+
+        // 1. Exact uppercase match
+        assertEquals("SR_2026113091911889_0452",
+                DynamicKarateBridge.extractDbOrMapValue(oracleRow, "REF_ID"));
+
+        // 2. Lowercase match against uppercase Oracle column
+        assertEquals("SR_2026113091911889_0452",
+                DynamicKarateBridge.extractDbOrMapValue(oracleRow, "ref_id"));
+
+        // 3. camelCase match against uppercase snake_case Oracle column
+        assertEquals("SR_2026113091911889_0452",
+                DynamicKarateBridge.extractDbOrMapValue(oracleRow, "refId"));
+        assertEquals(199.98,
+                DynamicKarateBridge.extractDbOrMapValue(oracleRow, "totalAmount"));
+
+        // 4. Prefixed with row. or latestRow. or $.
+        assertEquals("SR_2026113091911889_0452",
+                DynamicKarateBridge.extractDbOrMapValue(oracleRow, "row.ref_id"));
+        assertEquals("COMPLETED",
+                DynamicKarateBridge.extractDbOrMapValue(oracleRow, "row.STATUS"));
+        assertEquals("COMPLETED",
+                DynamicKarateBridge.extractDbOrMapValue(oracleRow, "latestRow.status"));
+        assertEquals("COMPLETED",
+                DynamicKarateBridge.extractDbOrMapValue(oracleRow, "$.STATUS"));
+        assertEquals(101,
+                DynamicKarateBridge.extractDbOrMapValue(oracleRow, "row.orderId"));
+
+        // 5. Composite payload (as merged in execute-db.feature)
+        Map<String, Object> composite = new LinkedHashMap<>(oracleRow);
+        composite.put("row", oracleRow);
+        composite.put("latestRow", oracleRow);
+        composite.put("rows", List.of(oracleRow));
+        composite.put("attempts", 1);
+        composite.put("matched", true);
+
+        assertEquals("COMPLETED", DynamicKarateBridge.extractDbOrMapValue(composite, "STATUS"));
+        assertEquals("COMPLETED", DynamicKarateBridge.extractDbOrMapValue(composite, "status"));
+        assertEquals("COMPLETED", DynamicKarateBridge.extractDbOrMapValue(composite, "row.status"));
+        assertEquals("COMPLETED", DynamicKarateBridge.extractDbOrMapValue(composite, "latestRow.STATUS"));
+    }
+
+    @Test
+    @DisplayName("Verify end-to-end DB Poll execution, variable extraction, and downstream variable chaining")
+    public void testDbPollExecutionAndVariableExtractionChaining() {
+        HikariConnectionPoolManager poolManager = new HikariConnectionPoolManager();
+        DbPollExecutor executor = new DbPollExecutor(poolManager);
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        WorkflowContextEngine contextEngine = new WorkflowContextEngine(objectMapper);
+        ExecutionLogBroadcaster logBroadcaster = new ExecutionLogBroadcaster(Optional.empty());
+        new DynamicKarateBridge(contextEngine, executor, null, logBroadcaster, objectMapper);
+
+        DbPollStepConfig config = new DbPollStepConfig();
+        config.setJdbcUrl("jdbc:h2:mem:chain_test_db;DB_CLOSE_DELAY=-1");
+        config.setUsername("sa");
+        config.setPassword("");
+        config.setDriverClassName("org.h2.Driver");
+        config.setQuery("SELECT 555 AS order_id, 'CONFIRMED' AS status, 'TRK-987654' AS tracking_code");
+        config.setCondition("row.status == 'CONFIRMED'");
+        config.setMaxAttempts(3);
+        config.setPollIntervalMs(50L);
+        config.setTimeoutMs(5000L);
+
+        DbPollExecutor.DbPollResult result = executor.execute(config);
+        assertTrue(result.isMatched(), "DB poll condition must match");
+        assertNotNull(result.getLatestRow());
+
+        // Composite payload matching execute-db.feature
+        Map<String, Object> dbPayload = new LinkedHashMap<>(result.getLatestRow());
+        dbPayload.put("row", result.getLatestRow());
+        dbPayload.put("latestRow", result.getLatestRow());
+        dbPayload.put("rows", result.getRows());
+        dbPayload.put("attempts", result.getAttempts());
+        dbPayload.put("matched", result.isMatched());
+
+        String execId = UUID.randomUUID().toString();
+        Map<String, Object> step = new HashMap<>();
+        step.put("id", "step_db_poll");
+        step.put("name", "Poll Database for Order");
+        step.put("type", "DB_POLL");
+        step.put("extractions", List.of(
+                Map.of("variableName", "dbOrderStatus", "source", "DB_ROW_COLUMN", "jsonPath", "STATUS"),
+                Map.of("variableName", "trackingCode", "source", "DB_ROW_COLUMN", "jsonPath", "tracking_code"),
+                Map.of("variableName", "orderId", "source", "RESPONSE_BODY", "jsonPath", "row.order_id")
+        ));
+
+        Map<String, Object> extracted = DynamicKarateBridge.extractVariables(execId, step, dbPayload, 200, Collections.emptyMap());
+
+        assertEquals("CONFIRMED", extracted.get("dbOrderStatus"));
+        assertEquals("TRK-987654", extracted.get("trackingCode"));
+        assertEquals(555, ((Number) extracted.get("orderId")).intValue());
+
+        // Downstream step consumes extracted variables
+        Map<String, Object> downstreamStep = new HashMap<>();
+        downstreamStep.put("id", "step_verify");
+        downstreamStep.put("name", "Verify Downstream");
+        downstreamStep.put("type", "HTTP_REQUEST");
+        downstreamStep.put("httpConfig", Map.of(
+                "url", "http://localhost:8080/api/v1/mock/orders/${orderId}",
+                "headers", Map.of("X-Tracking-Code", "${trackingCode}", "X-Status", "${dbOrderStatus}")
+        ));
+
+        Map<String, Object> resolved = DynamicKarateBridge.resolveStepVariables(execId, downstreamStep, extracted);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> resolvedHttpCfg = (Map<String, Object>) resolved.get("httpConfig");
+        assertEquals("http://localhost:8080/api/v1/mock/orders/555", resolvedHttpCfg.get("url"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> resolvedHeaders = (Map<String, Object>) resolvedHttpCfg.get("headers");
+        assertEquals("TRK-987654", resolvedHeaders.get("X-Tracking-Code"));
+        assertEquals("CONFIRMED", resolvedHeaders.get("X-Status"));
+
+        // Cleanup
+        DynamicKarateBridge.cleanupExecution(execId);
     }
 }

@@ -506,9 +506,83 @@ public class TestWorkflowService {
                 log.info("Seeding default demo test workflow...");
                 seedDemoOrderProcessingWorkflow();
             }
+            seedDedicatedDbPollWorkflowIfMissing();
         } catch (Exception e) {
             log.warn("Could not seed initial workflow: {}", e.getMessage());
         }
+    }
+
+    private void seedDedicatedDbPollWorkflowIfMissing() {
+        try {
+            boolean exists = workflowRepository.findAll().stream()
+                    .anyMatch(w -> "Database Polling & Variable Chaining Demo".equalsIgnoreCase(w.getName()));
+            if (!exists) {
+                log.info("Seeding dedicated Database Polling & Variable Chaining Demo workflow...");
+                seedDedicatedDbPollWorkflow();
+            }
+        } catch (Exception e) {
+            log.warn("Could not seed dedicated DB poll workflow: {}", e.getMessage());
+        }
+    }
+
+    private void seedDedicatedDbPollWorkflow() {
+        WorkflowCreateRequest req = new WorkflowCreateRequest();
+        req.setName("Database Polling & Variable Chaining Demo");
+        req.setDescription("Demonstrates polling an in-memory SQL database, extracting multiple row columns, and consuming them downstream.");
+
+        CanvasState state = new CanvasState();
+        List<CanvasNode> nodes = new ArrayList<>();
+
+        // Node 1: DB SQL Poll Step
+        CanvasNode node1 = new CanvasNode();
+        node1.setId("step_db_poll");
+        node1.setType("dbPoll");
+        node1.setPosition(new CanvasPosition(150, 100));
+        Map<String, Object> data1 = new HashMap<>();
+        data1.put("name", "Query Database & Extract Variables");
+        data1.put("jdbcUrl", "jdbc:h2:mem:demo_orders;DB_CLOSE_DELAY=-1");
+        data1.put("username", "sa");
+        data1.put("password", "");
+        data1.put("driverClassName", "org.h2.Driver");
+        data1.put("query", "SELECT 101 AS order_id, 'READY_FOR_SHIPMENT' AS order_status, 'CARRIER_FEDEX' AS carrier, 49.99 AS total_amount");
+        data1.put("condition", "row.order_status == 'READY_FOR_SHIPMENT'");
+        data1.put("timeoutMs", 5000L);
+        data1.put("pollIntervalMs", 500L);
+        data1.put("maxAttempts", 3);
+        data1.put("extractions", List.of(
+                Map.of("variableName", "extractedOrderId", "source", "DB_ROW_COLUMN", "jsonPath", "order_id"),
+                Map.of("variableName", "extractedStatus", "source", "DB_ROW_COLUMN", "jsonPath", "ORDER_STATUS"),
+                Map.of("variableName", "carrierCode", "source", "DB_ROW_COLUMN", "jsonPath", "carrier")
+        ));
+        node1.setData(data1);
+        nodes.add(node1);
+
+        // Node 2: HTTP Verification Step consuming extracted DB variables
+        CanvasNode node2 = new CanvasNode();
+        node2.setId("step_verify_order");
+        node2.setType("httpRequest");
+        node2.setPosition(new CanvasPosition(150, 300));
+        Map<String, Object> data2 = new HashMap<>();
+        data2.put("name", "Verify Order API using DB Variables");
+        data2.put("method", "GET");
+        data2.put("url", "http://localhost:8080/api/v1/mock/orders/${extractedOrderId}");
+        data2.put("headers", Map.of("X-Carrier-Code", "${carrierCode}", "X-DB-Status", "${extractedStatus}"));
+        data2.put("expectedStatus", 200);
+        data2.put("assertions", List.of(
+                Map.of("field", "status", "operator", "EQUALS", "expectedValue", "200")
+        ));
+        node2.setData(data2);
+        nodes.add(node2);
+
+        state.setNodes(nodes);
+
+        List<CanvasEdge> edges = new ArrayList<>();
+        edges.add(createEdge("e_db_1", "step_db_poll", "step_verify_order"));
+        state.setEdges(edges);
+
+        req.setCanvasState(state);
+        createWorkflow(req);
+        log.info("Dedicated DB polling demo workflow seeded successfully");
     }
 
     private void seedDemoOrderProcessingWorkflow() {
@@ -560,14 +634,26 @@ public class TestWorkflowService {
         node2.setData(data2);
         nodes.add(node2);
 
-        // Node 3: Delay
+        // Node 3: DB SQL Poll Step
         CanvasNode node3 = new CanvasNode();
-        node3.setId("step_delay");
-        node3.setType("delay");
+        node3.setId("step_db_poll");
+        node3.setType("dbPoll");
         node3.setPosition(new CanvasPosition(150, 420));
         Map<String, Object> data3 = new HashMap<>();
-        data3.put("name", "Wait for Async Processing");
-        data3.put("delayMs", 1500L);
+        data3.put("name", "Poll Order DB & Extract Details");
+        data3.put("jdbcUrl", "jdbc:h2:mem:demo_orders;DB_CLOSE_DELAY=-1");
+        data3.put("username", "sa");
+        data3.put("password", "");
+        data3.put("driverClassName", "org.h2.Driver");
+        data3.put("query", "SELECT '${orderId}' AS order_id, 'CONFIRMED' AS status, 'TRK-987654' AS tracking_code");
+        data3.put("condition", "row.status == 'CONFIRMED'");
+        data3.put("timeoutMs", 5000L);
+        data3.put("pollIntervalMs", 500L);
+        data3.put("maxAttempts", 3);
+        data3.put("extractions", List.of(
+                Map.of("variableName", "dbOrderStatus", "source", "DB_ROW_COLUMN", "jsonPath", "STATUS"),
+                Map.of("variableName", "trackingCode", "source", "DB_ROW_COLUMN", "jsonPath", "tracking_code")
+        ));
         node3.setData(data3);
         nodes.add(node3);
 
@@ -580,11 +666,11 @@ public class TestWorkflowService {
         data4.put("name", "Verify Order Details");
         data4.put("method", "GET");
         data4.put("url", "http://localhost:8080/api/v1/mock/orders/${orderId}");
-        data4.put("headers", Map.of("Authorization", "Bearer ${authToken}"));
+        data4.put("headers", Map.of("Authorization", "Bearer ${authToken}", "X-Tracking-Code", "${trackingCode}"));
         data4.put("expectedStatus", 200);
         data4.put("assertions", List.of(
                 Map.of("field", "status", "operator", "EQUALS", "expectedValue", "200"),
-                Map.of("field", "body.status", "operator", "EQUALS", "expectedValue", "CONFIRMED")
+                Map.of("field", "body.status", "operator", "EQUALS", "expectedValue", "${dbOrderStatus}")
         ));
         node4.setData(data4);
         nodes.add(node4);
@@ -594,8 +680,8 @@ public class TestWorkflowService {
         // Edges
         List<CanvasEdge> edges = new ArrayList<>();
         edges.add(createEdge("e1", "step_auth", "step_create_order"));
-        edges.add(createEdge("e2", "step_create_order", "step_delay"));
-        edges.add(createEdge("e3", "step_delay", "step_get_order"));
+        edges.add(createEdge("e2", "step_create_order", "step_db_poll"));
+        edges.add(createEdge("e3", "step_db_poll", "step_get_order"));
         state.setEdges(edges);
 
         req.setCanvasState(state);
