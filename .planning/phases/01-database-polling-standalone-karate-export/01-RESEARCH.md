@@ -398,11 +398,10 @@ if (colName.toLowerCase() !== colName) {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **How should complex multi-condition strings like `row.status == 'COMPLETED' && row.retry_count > 2` be exported?**
-   - *What we know:* Standard simple equality conditions (`row.status == 'COMPLETED'`) and row count checks (`count > 0`, `expectedRowCount == 1`) represent 95%+ of workflows.
-   - *Recommendation:* Generate `function(rows) { if (rows.length === 0) return false; var row = rows[0]; return <condition>; }` directly in JavaScript, providing case-insensitive fallback property matching when `==` split is detected.
+1. **RESOLVED: How should complex multi-condition strings like `row.status == 'COMPLETED' && row.retry_count > 2` be exported?**
+   - *Resolution:* Generate `function(rows) { if (rows.length === 0) return false; var row = rows[0]; return <condition>; }` directly in JavaScript, providing case-insensitive fallback property matching when `==` split is detected. Simple equality and row count assertions cover the vast majority of cases.
 
 ---
 

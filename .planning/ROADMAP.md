@@ -30,7 +30,10 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 2 plans
 
 Plans:
+**Wave 1**
 - [ ] 01-01-PLAN.md — Standalone Karate feature exporter enhancement for DB polling steps
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 01-02-PLAN.md — Standalone Karate execution and portability tests
 
 ### Phase 2: Form URL-Encoded Requests End-to-End

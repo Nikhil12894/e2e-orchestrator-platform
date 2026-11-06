@@ -504,7 +504,7 @@ public void testStandaloneKarateFeatureExecutionStandalone() throws Exception {
         Files.writeString(tempFeature, featureContent, StandardCharsets.UTF_8);
 
         // 5. Execute via standard Karate Runner (simulating external CI runner)
-        com.intuit.karate.SuiteResult results = com.intuit.karate.core.Runner.path(tempFeature.toAbsolutePath().toString())
+        io.karatelabs.core.SuiteResult results = io.karatelabs.core.Runner.path(tempFeature.toAbsolutePath().toString())
                 .outputHtmlReport(false)
                 .parallel(1);
 
