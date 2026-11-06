@@ -43,20 +43,20 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ENV-01 | Pending | Pending |
-| ENV-02 | Pending | Pending |
-| ENV-03 | Pending | Pending |
-| BUILD-01 | Pending | Pending |
-| BUILD-02 | Pending | Pending |
-| BUILD-03 | Pending | Pending |
-| DOCKER-01 | Pending | Pending |
-| DOCKER-02 | Pending | Pending |
+| ENV-01 | Phase 1 | Pending |
+| ENV-02 | Phase 1 | Pending |
+| ENV-03 | Phase 1 | Pending |
+| BUILD-01 | Phase 1 | Pending |
+| BUILD-02 | Phase 1 | Pending |
+| BUILD-03 | Phase 1 | Pending |
+| DOCKER-01 | Phase 2 | Pending |
+| DOCKER-02 | Phase 2 | Pending |
 
 **Coverage:**
 - v1 requirements: 8 total
-- Mapped to phases: 0
-- Unmapped: 8 ⚠️
+- Mapped to phases: 8
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-11-06*
-*Last updated: 2026-11-06 after initial definition*
+*Last updated: 2026-11-06 after roadmap creation*
