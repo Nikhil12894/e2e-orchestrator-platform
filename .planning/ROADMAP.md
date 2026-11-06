@@ -27,7 +27,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. `frontend/package.json` engines field enforces `node >=26.0.0` and `.nvmrc` specifies Node 26 for local environment consistency
   3. TypeScript compilation (`tsc`) succeeds with zero type errors using Node 26 typings
   4. Production bundle build (`vite build`) completes cleanly and outputs verified distribution assets in `frontend/dist/`
-**Plans:** TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 01-01-PLAN.md — Configure Node 26 environment and strict engine checking, update @types/node with clean npm ci lockfile resolution, and verify tsc typecheck and vite production bundling
 **UI hint:** yes
 
 ### Phase 2: Docker Container Packaging
@@ -48,5 +51,5 @@ Phases execute in numeric order: 1 → 2
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Frontend Toolchain & Build Verification | 0/TBD | Not started | - |
+| 1. Frontend Toolchain & Build Verification | 0/1 | Not started | - |
 | 2. Docker Container Packaging | 0/TBD | Not started | - |
