@@ -6,7 +6,7 @@
     {
       "number": "1",
       "name": "Database Polling Standalone Karate Export",
-      "status": "in_progress"
+      "status": "complete"
     },
     {
       "number": "2",
@@ -16,8 +16,8 @@
   ],
   "next": {
     "command": "/gsd-progress --next",
-    "label": "Advance to the next step",
-    "reason": "Phase 1 of 2 · 0% · executing"
+    "label": "Advance to the next step (plan phase 2)",
+    "reason": "Phase 2 of 2 — needs a plan"
   },
-  "updated_at": "2026-11-07T01:38:19.531Z"
+  "updated_at": "2026-11-07T02:23:44.892Z"
 }
