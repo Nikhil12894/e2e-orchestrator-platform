@@ -1,23 +1,12 @@
 {
   "contract": "1.0.0",
   "flavor": "core",
-  "milestone": null,
-  "phases": [
-    {
-      "number": "1",
-      "name": "Database Polling Standalone Karate Export",
-      "status": "complete"
-    },
-    {
-      "number": "2",
-      "name": "Form URL-Encoded Requests End-to-End",
-      "status": "complete"
-    }
-  ],
+  "milestone": "v1.1",
+  "phases": [],
   "next": {
-    "command": "/gsd-progress",
-    "label": "Show progress",
-    "reason": "Unsure of state — showing progress"
+    "command": "/gsd-discuss-phase",
+    "label": "Discuss the first phase",
+    "reason": "Project initialized — plan your first phase"
   },
-  "updated_at": "2026-11-07T09:43:58.581Z"
+  "updated_at": "2026-11-07T15:48:52.740Z"
 }

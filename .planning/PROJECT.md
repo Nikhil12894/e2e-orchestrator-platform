@@ -1,12 +1,21 @@
-# E2E Test Workflow Orchestrator - Standalone DB Export & Form URL-Encoded Requests
+# E2E Test Workflow Orchestrator - Execution Status & Report URLs for cURL / CI/CD
 
 ## What This Is
 
-The End-to-End Test Workflow Orchestrator is a full-stack developer platform for visually authoring, executing, and monitoring automated API, database, and event-driven test workflows. This milestone adds comprehensive standalone Karate `.feature` export for database polling steps and introduces first-class support for `application/x-www-form-urlencoded` HTTP requests in the visual editor, execution runtime, and export pipelines.
+The End-to-End Test Workflow Orchestrator is a full-stack developer platform for visually authoring, executing, and monitoring automated API, database, and event-driven test workflows. This milestone introduces comprehensive execution tracking, status monitoring, and Karate HTML report discovery for workflows triggered via cURL and external CI/CD pipelines.
 
 ## Core Value
 
-Ensure complete functional parity and execution fidelity between visual workflows, dynamic in-memory Karate execution, and standalone exported Karate `.feature` files for all step types including database polling and form-parameter HTTP requests.
+Ensure complete functional parity and execution fidelity between visual workflows, dynamic in-memory Karate execution, and standalone exported Karate `.feature` files, while providing frictionless execution status tracking and direct HTML report access for automated pipelines and terminal users.
+
+## Current Milestone: v1.1 Execution Status & Report URLs for cURL / CI/CD
+
+**Goal:** Provide direct execution tracking, status monitoring, and Karate HTML report URLs when triggering workflows via cURL and CI/CD pipelines, supporting both asynchronous tracking and synchronous wait execution modes.
+
+**Target features:**
+- Execution Response Navigation URLs: Include absolute `statusUrl`, `reportUrl`, and `streamUrl` properties in `POST /api/v1/workflows/{id}/execute` and `GET /api/v1/executions/{id}`, plus an HTTP `Location` header.
+- Synchronous Execution Parameter: Support `?wait=true` (with optional `&timeoutSec=N`) on the execution trigger endpoint so CI/CD callers can block until completion and receive final status and report link directly in the response.
+- CI/CD Webhook Modal Enhancements: Update the visual modal to display enriched response structures, status polling cURL snippets, and synchronous pipeline commands.
 
 ## Requirements
 
@@ -20,19 +29,22 @@ Ensure complete functional parity and execution fidelity between visual workflow
 - ✓ Kafka consumer assertion steps for event-driven testing — existing
 - ✓ Real-time execution logs and progress streaming via WebSocket STOMP and SSE — existing
 - ✓ Standalone Karate `.feature` file export for HTTP, delay, and transform steps — existing
-- ✓ **Karate Feature Export for DB Poll Steps**: Export executable database polling steps in standalone `.feature` files utilizing self-contained inline JDBC functions (`java.sql.DriverManager`), supporting retry loops, expected row counts, custom SQL conditions, and downstream variable extraction without requiring proprietary platform classes on external classpaths — Phase 1
-- ✓ **HTTP Form URL-Encoded Configuration Drawer**: Add a Request Body Type toggle (`JSON` vs `x-www-form-urlencoded`) in the visual node drawer when method is `POST`, `PUT`, or `PATCH`, with an interactive key-value table editor, variable injection, and automatic `Content-Type: application/x-www-form-urlencoded` header synchronization — Phase 2
-- ✓ **HTTP Form URL-Encoded AST & Execution**: Enhance `HttpRequestStepConfig` with body type support and update `execute-http.feature` to natively invoke Karate's `form fields` keyword instead of `request` when sending form-encoded requests — Phase 2
-- ✓ **HTTP Form URL-Encoded Standalone Export**: Update `TestWorkflowService.generateStandaloneKarateFeature()` to emit native Karate `form fields` syntax when exporting form-encoded HTTP steps — Phase 2
+- ✓ **Karate Feature Export for DB Poll Steps**: Export executable database polling steps in standalone `.feature` files utilizing self-contained inline JDBC functions (`java.sql.DriverManager`), supporting retry loops, expected row counts, custom SQL conditions, and downstream variable extraction without requiring proprietary platform classes on external classpaths — v1.0 Phase 1
+- ✓ **HTTP Form URL-Encoded Configuration Drawer**: Add a Request Body Type toggle (`JSON` vs `x-www-form-urlencoded`) in the visual node drawer when method is `POST`, `PUT`, or `PATCH`, with an interactive key-value table editor, variable injection, and automatic `Content-Type: application/x-www-form-urlencoded` header synchronization — v1.0 Phase 2
+- ✓ **HTTP Form URL-Encoded AST & Execution**: Enhance `HttpRequestStepConfig` with body type support and update `execute-http.feature` to natively invoke Karate's `form fields` keyword instead of `request` when sending form-encoded requests — v1.0 Phase 2
+- ✓ **HTTP Form URL-Encoded Standalone Export**: Update `TestWorkflowService.generateStandaloneKarateFeature()` to emit native Karate `form fields` syntax when exporting form-encoded HTTP steps — v1.0 Phase 2
 
 ### Active
 
-*(All milestone requirements complete)*
+- [ ] **EXEC-01**: Execution trigger and details responses include absolute `statusUrl`, `reportUrl`, and `streamUrl` navigation properties derived from the request origin.
+- [ ] **EXEC-02**: Workflow execution trigger endpoint (`POST /api/v1/workflows/{id}/execute`) sets standard HTTP `Location` header pointing to the status URL.
+- [ ] **EXEC-03**: Workflow execution trigger supports `?wait=true` (with optional `&timeoutSec=N`) to block until execution completes, returning HTTP 200 with final status and report URL.
+- [ ] **EXEC-04**: `CiCdWebhookModal` provides clear cURL commands for async execution with status check, synchronous wait mode, and direct Karate HTML report link template.
 
 ### Out of Scope
 
-- Multipart / form-data file uploads — separate milestone; this milestone focuses on `application/x-www-form-urlencoded`.
-- External standalone JAR dependency requirements for DB tests — standalone exported Karate features must remain runnable using only standard JDBC drivers and standard Karate CLI/Maven.
+- Multipart / form-data file uploads — separate milestone; this milestone focuses on execution URLs and status tracking.
+- External standalone JAR dependency requirements for DB tests — standalone exported Karate features remain runnable using only standard JDBC drivers and standard Karate CLI/Maven.
 
 ## Context
 
