@@ -34,13 +34,13 @@ The primary focal point is the **Request Body Type Selector** segmented button g
 
 ### Visual Hierarchy
 1. **Focal Anchor — Body Type Segmented Control:** Two equal-width toggle buttons (`JSON Body` vs `URL-Encoded Form`) with an active state highlight (`bg-blue-600/20 text-blue-300 border-blue-500 font-semibold`) and inactive state (`bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200`).
-2. **Interactive Form Table:** When `URL-Encoded Form` is active, a structured key-value table container (`bg-slate-950/70 border-slate-800 rounded-xl p-3`) displays parameter rows with monospace input fields for parameter keys and values.
-3. **Auto-Synchronization Callout Badge:** A dedicated status indicator badge (`bg-sky-500/10 text-sky-400 border border-sky-500/30 text-[10px] font-mono`) displays `Auto-synced: Content-Type: application/x-www-form-urlencoded` to give users continuous visual assurance that the request header matches the selected body format.
+2. **Interactive Form Table:** When `URL-Encoded Form` is active, a structured key-value table container (`bg-slate-950/70 border-slate-800 rounded-xl p-4`) displays parameter rows with monospace input fields for parameter keys and values.
+3. **Auto-Synchronization Callout Badge:** A dedicated status indicator badge (`bg-sky-500/10 text-sky-400 border border-sky-500/30 text-[11px] font-mono py-1 px-2`) displays `Auto-synced: Content-Type: application/x-www-form-urlencoded` to give users continuous visual assurance that the request header matches the selected body format.
 4. **Action Affordances:** Primary action button ("Add Form Field") styled with a blue plus icon, and row-level secondary action buttons for variable selection (`Variable` icon with emerald hover) and deletion (`Trash2` icon with red hover).
 
 ### Accessibility & Targets
-- Table input fields have a minimum height of 32px (`py-1.5 px-2.5`).
-- Row-level action buttons have a minimum click target of 28px × 28px (`p-1.5` with rounded bounds).
+- Table input fields have a standard height of 32px (`h-8`, token xl = 32px, padding `py-1 px-2` = 4px / 8px = xs / sm).
+- Row-level action buttons have a standard click target of 32px × 32px (`h-8 w-8`, token xl = 32px, padding `p-2` = sm = 8px).
 - All icon-only action triggers carry accessible `aria-label` attributes and `title` tooltips:
   - `aria-label="Insert variable into form parameter value"`
   - `aria-label="Delete form parameter row"`
@@ -53,13 +53,13 @@ Declared values (must be multiples of 4):
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| xs | 4px | Icon-to-text gaps (`gap-1`), compact badge padding (`py-0.5 px-1.5`) |
-| sm | 8px | Form row item gaps (`gap-2`), input vertical padding (`py-1.5`), table row spacing (`space-y-2`) |
+| xs | 4px | Icon-to-text gaps (`gap-1`), compact badge vertical padding (`py-1`) |
+| sm | 8px | Form row item gaps (`gap-2`), input vertical and horizontal padding (`py-2 px-2`), table row spacing (`space-y-2`) |
 | md | 16px | Section padding (`p-4`), drawer container margins, layout groupings (`space-y-4`) |
 | lg | 24px | Major drawer tab section padding, modal body gutters |
-| xl | 32px | Drawer action button minimum heights (`h-8`), toolbar spacing |
-| 2xl | 48px | Drawer header bar height, large element vertical separation |
-| 3xl | 64px | Modal outer padding, canvas minimum viewport bounds |
+| xl | 32px | Drawer action button heights and widths (`h-8 w-8`), input heights (`h-8`), toolbar spacing |
+| 2xl | 48px | Drawer header bar height (`h-12`), large element vertical separation |
+| 3xl | 64px | Modal outer padding, canvas minimum viewport bounds (`h-16`) |
 
 Exceptions: none
 
@@ -70,14 +70,14 @@ Exceptions: none
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
 | Label | 11px | 600 | 1.2 |
-| Body | 12px | 400 | 1.5 |
-| Heading | 14px | 600 | 1.2 |
-| Display | 16px | 600 | 1.2 |
+| Body | 13px | 400 | 1.5 |
+| Heading | 16px | 600 | 1.2 |
+| Display | 18px | 600 | 1.2 |
 
-- **Label (11px, weight 600, line-height 1.2):** Used for input labels, table column headers, uppercase category tags, and status badges.
-- **Body (12px, weight 400, line-height 1.5):** Used for parameter key and value inputs, helper descriptions, and modal explanatory text.
-- **Heading (14px, weight 600, line-height 1.2):** Used for subsection headers such as "Form Parameters" and "Request Body Format".
-- **Display (16px, weight 600, line-height 1.2):** Used for drawer title headers and top-level step configuration headings.
+- **Label (11px, weight 600, line-height 1.2):** Used for input labels, table column headers, status badges, and uppercase category tags.
+- **Body (13px, weight 400, line-height 1.5):** Used for parameter key and value inputs, helper descriptions, and modal explanatory text.
+- **Heading (16px, weight 600, line-height 1.2):** Used for subsection headers such as "Form Parameters" and "Request Body Format".
+- **Display (18px, weight 600, line-height 1.2):** Used for drawer title headers and top-level step configuration headings.
 
 ---
 
@@ -128,7 +128,7 @@ Applicable state considerations resolved: 7 covered, 1 backstop, 0 unresolved
 | error | Parameter Key Validation | ✅ covered | Duplicate parameter keys display an inline rose-400 alert message pointing out the duplicated key name |
 | populated | Parameter Rows | ✅ covered | Populated table displays monospace key and value inputs, variable selector trigger button, and delete action button |
 | partial | Incomplete Parameter Rows | ✅ covered | A row with a key and blank value serializes as an empty value (`key=`); blank keys with values are highlighted with a red outline for resolution |
-| overflow | Parameter List Container | ✅ covered | Parameter list container uses a fixed maximum height (`max-h-64`) with vertical auto-scrolling (`overflow-y-auto`) and custom slate scrollbars |
+| overflow | Parameter List Container | ✅ covered | Parameter list container uses a scrollable frame (`max-h-64 overflow-y-auto`) with custom slate scrollbars |
 | zero-one-many | Parameter Row Count | ✅ covered | Zero displays empty guidance; one displays a single full-width row; many displays compact stacked rows within the scrollable container |
 | long-text | Monospace Parameter Inputs | 🧪 backstop | Unusually long parameter names, expressions, or values scroll horizontally inside input fields without breaking table column alignment or container width |
 
