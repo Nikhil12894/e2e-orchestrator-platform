@@ -518,7 +518,7 @@ All claims in this research have been verified against the codebase files (`fron
 </assumptions_log>
 
 <open_questions>
-## Open Questions
+## Open Questions (RESOLVED)
 
 None. All technical unknowns regarding Karate DSL `form fields` syntax, AST data modeling, variable resolution, and UI specifications have been investigated and verified.
 </open_questions>
