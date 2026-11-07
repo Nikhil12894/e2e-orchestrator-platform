@@ -365,7 +365,14 @@ public class TestWorkflowService {
                         }
                     }
                 }
-                if (cfg.getBody() != null) {
+                boolean isForm = cfg.isFormEncoded();
+                if (isForm) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> formMap = cfg.getFormData() != null && !cfg.getFormData().isEmpty()
+                            ? cfg.getFormData()
+                            : (cfg.getBody() instanceof Map ? (Map<String, Object>) cfg.getBody() : Collections.emptyMap());
+                    sb.append("    And form fields ").append(formatFormFieldsExpression(formMap)).append("\n");
+                } else if (cfg.getBody() != null) {
                     try {
                         String bodyJson = objectMapper.writeValueAsString(cfg.getBody());
                         sb.append("    And request ").append(bodyJson).append("\n");
@@ -560,6 +567,36 @@ public class TestWorkflowService {
         return out.toString();
     }
 
+    private String formatFormFieldsExpression(Map<String, Object> formMap) {
+        if (formMap == null || formMap.isEmpty()) {
+            return "{}";
+        }
+        boolean hasVariables = formMap.values().stream()
+                .anyMatch(v -> v != null && v.toString().contains("${"));
+
+        if (!hasVariables) {
+            try {
+                return objectMapper.writeValueAsString(formMap);
+            } catch (Exception ignored) {}
+        }
+
+        StringBuilder sb = new StringBuilder("{ ");
+        int idx = 0;
+        for (Map.Entry<String, Object> entry : formMap.entrySet()) {
+            if (idx++ > 0) sb.append(", ");
+            String key = entry.getKey().replace("'", "\\'");
+            String val = entry.getValue() != null ? entry.getValue().toString() : "";
+            sb.append("'").append(key).append("': ");
+            if (val.contains("${")) {
+                sb.append(formatKarateExpression(val));
+            } else {
+                sb.append("'").append(val.replace("'", "\\'")).append("'");
+            }
+        }
+        sb.append(" }");
+        return sb.toString();
+    }
+
     @Transactional
     public TestWorkflowEntity importWorkflow(WorkflowCreateRequest request) {
         String originalName = request.getName() != null ? request.getName() : "Imported Workflow";
@@ -685,6 +722,20 @@ public class TestWorkflowService {
             }
             if (data.get("body") != null) {
                 httpConfig.setBody(data.get("body"));
+            }
+            if (data.get("bodyType") != null) {
+                httpConfig.setBodyType(String.valueOf(data.get("bodyType")));
+            }
+            if (data.get("formData") instanceof Map<?, ?> formMap) {
+                httpConfig.setFormData(new LinkedHashMap<>((Map<String, Object>) formMap));
+            } else if (data.get("formData") instanceof List<?> list) {
+                Map<String, Object> formMap = new LinkedHashMap<>();
+                for (Object item : list) {
+                    if (item instanceof Map<?, ?> m && m.get("key") != null) {
+                        formMap.put(String.valueOf(m.get("key")), m.get("value"));
+                    }
+                }
+                httpConfig.setFormData(formMap);
             }
             if (data.get("expectedStatus") != null) {
                 httpConfig.setExpectedStatus(Integer.parseInt(String.valueOf(data.get("expectedStatus"))));

@@ -752,4 +752,81 @@ public class WorkflowFeaturesAndPortabilityTest {
         assertEquals(1, finished.getStepResults().size());
         assertEquals(200, finished.getStepResults().get(0).getHttpStatus());
     }
+
+    @Test
+    @DisplayName("Verify Standalone Karate .feature export generates and executes form fields")
+    public void testStandaloneKarateFeatureExportFormUrlEncoded() {
+        WorkflowCreateRequest req = new WorkflowCreateRequest();
+        req.setName("Form Encoded Export Syntax Test");
+
+        CanvasState state = new CanvasState();
+        CanvasNode node = new CanvasNode();
+        node.setId("step_form_post");
+        node.setType("httpRequest");
+        node.setPosition(new CanvasPosition(100, 100));
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("name", "Form Token Request");
+        data.put("method", "POST");
+        data.put("url", "http://localhost:" + port + "/api/v1/mock/auth/token");
+        data.put("bodyType", "FORM_URL_ENCODED");
+        Map<String, Object> formParams = new LinkedHashMap<>();
+        formParams.put("username", "admin");
+        formParams.put("grant_type", "password");
+        formParams.put("env_token", "${$env:TEST_SECRET}");
+        data.put("formData", formParams);
+        data.put("expectedStatus", 200);
+        node.setData(data);
+
+        state.setNodes(List.of(node));
+        req.setCanvasState(state);
+
+        TestWorkflowEntity wf = workflowService.createWorkflow(req);
+        String feature = workflowService.generateStandaloneKarateFeature(wf.getId());
+
+        assertTrue(feature.contains("And form fields"), "Export must contain 'form fields' keyword");
+        assertFalse(feature.contains("And request"), "Export must NOT emit 'request' for form-encoded steps");
+        assertTrue(feature.contains("java.lang.System.getenv('TEST_SECRET')"), "Export must format dynamic env variables");
+    }
+
+    @Test
+    @DisplayName("Verify Standalone Karate .feature execution with form fields against mock endpoint")
+    public void testStandaloneKarateFeatureExecutionFormUrlEncoded() throws Exception {
+        WorkflowCreateRequest req = new WorkflowCreateRequest();
+        req.setName("Form Encoded Standalone Execution Test");
+
+        CanvasState state = new CanvasState();
+        CanvasNode node = new CanvasNode();
+        node.setId("step_form_post_exec");
+        node.setType("httpRequest");
+        node.setPosition(new CanvasPosition(100, 100));
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("name", "Form Token Exec Request");
+        data.put("method", "POST");
+        data.put("url", "http://localhost:" + port + "/api/v1/mock/auth/token");
+        data.put("bodyType", "FORM_URL_ENCODED");
+        data.put("formData", Map.of("username", "standalone_user", "grant_type", "client_credentials"));
+        data.put("expectedStatus", 200);
+        node.setData(data);
+
+        state.setNodes(List.of(node));
+        req.setCanvasState(state);
+
+        TestWorkflowEntity wf = workflowService.createWorkflow(req);
+        String feature = workflowService.generateStandaloneKarateFeature(wf.getId());
+
+        Path tempFeature = Files.createTempFile("standalone-form-test-", ".feature");
+        try {
+            Files.writeString(tempFeature, feature, StandardCharsets.UTF_8);
+            SuiteResult results = Runner.path(tempFeature.toAbsolutePath().toString())
+                    .outputHtmlReport(false)
+                    .parallel(1);
+
+            assertFalse(results.isFailed(), "Execution failed: " + (results.getErrors() != null ? String.join("\n", results.getErrors()) : ""));
+            assertEquals(0, results.getScenarioFailedCount());
+        } finally {
+            Files.deleteIfExists(tempFeature);
+        }
+    }
 }
