@@ -223,6 +223,115 @@ public class TestWorkflowService {
         sb.append("\n");
 
         List<WorkflowStep> steps = ast != null && ast.getSteps() != null ? ast.getSteps() : Collections.emptyList();
+        boolean hasDbSteps = steps.stream()
+                .anyMatch(s -> s.getType() == StepType.DB_POLL && s.isEnabled());
+
+        if (hasDbSteps) {
+            sb.append("    # Reusable Standalone JDBC Helper Functions\n");
+            sb.append("    * def dbQuery =\n");
+            sb.append("      \"\"\"\n");
+            sb.append("      function(cfg) {\n");
+            sb.append("        var DriverManager = Java.type('java.sql.DriverManager');\n");
+            sb.append("        if (cfg.driverClassName) {\n");
+            sb.append("          try {\n");
+            sb.append("            Java.type('java.lang.Class').forName(cfg.driverClassName);\n");
+            sb.append("          } catch(e) {}\n");
+            sb.append("        }\n");
+            sb.append("        var resolveToken = function(str) {\n");
+            sb.append("          if (!str || str.indexOf('${') === -1) return str;\n");
+            sb.append("          return str.replace(/\\$\\{([^}]+)\\}/g, function(match, key) {\n");
+            sb.append("            var k = key.trim();\n");
+            sb.append("            if (k.indexOf('$env:') === 0 || k.indexOf('env:') === 0) {\n");
+            sb.append("              var ek = k.substring(k.indexOf(':') + 1).trim();\n");
+            sb.append("              return karate.properties[ek] || java.lang.System.getenv(ek) || match;\n");
+            sb.append("            }\n");
+            sb.append("            if (k.indexOf('$secret:') === 0 || k.indexOf('secret:') === 0) {\n");
+            sb.append("              var sk = k.substring(k.indexOf(':') + 1).trim();\n");
+            sb.append("              return karate.properties[sk] || java.lang.System.getenv(sk) || match;\n");
+            sb.append("            }\n");
+            sb.append("            var val = karate.get(k);\n");
+            sb.append("            return val !== null && val !== undefined ? val : match;\n");
+            sb.append("          });\n");
+            sb.append("        };\n");
+            sb.append("        var url = resolveToken(cfg.jdbcUrl);\n");
+            sb.append("        var user = resolveToken(cfg.username);\n");
+            sb.append("        var pass = resolveToken(cfg.password || '');\n");
+            sb.append("        var query = resolveToken(cfg.query);\n");
+            sb.append("        var conn = null;\n");
+            sb.append("        var stmt = null;\n");
+            sb.append("        var rs = null;\n");
+            sb.append("        var rows = [];\n");
+            sb.append("        try {\n");
+            sb.append("          if (user) {\n");
+            sb.append("            conn = DriverManager.getConnection(url, user, pass);\n");
+            sb.append("          } else {\n");
+            sb.append("            conn = DriverManager.getConnection(url);\n");
+            sb.append("          }\n");
+            sb.append("          stmt = conn.createStatement();\n");
+            sb.append("          rs = stmt.executeQuery(query);\n");
+            sb.append("          var md = rs.getMetaData();\n");
+            sb.append("          var colCount = md.getColumnCount();\n");
+            sb.append("          while (rs.next()) {\n");
+            sb.append("            var row = {};\n");
+            sb.append("            for (var i = 1; i <= colCount; i++) {\n");
+            sb.append("              var colName = md.getColumnLabel(i);\n");
+            sb.append("              var val = rs.getObject(i);\n");
+            sb.append("              row[colName] = val;\n");
+            sb.append("              if (colName.toLowerCase() !== colName) {\n");
+            sb.append("                row[colName.toLowerCase()] = val;\n");
+            sb.append("              }\n");
+            sb.append("            }\n");
+            sb.append("            rows.push(row);\n");
+            sb.append("          }\n");
+            sb.append("        } catch(e) {\n");
+            sb.append("          karate.log('JDBC query error:', e.message);\n");
+            sb.append("        } finally {\n");
+            sb.append("          if (rs) try { rs.close(); } catch(e) {}\n");
+            sb.append("          if (stmt) try { stmt.close(); } catch(e) {}\n");
+            sb.append("          if (conn) try { conn.close(); } catch(e) {}\n");
+            sb.append("        }\n");
+            sb.append("        return rows;\n");
+            sb.append("      }\n");
+            sb.append("      \"\"\"\n");
+            sb.append("    * def dbPoll =\n");
+            sb.append("      \"\"\"\n");
+            sb.append("      function(cfg, maxAttempts, intervalMs, timeoutMs, conditionFn) {\n");
+            sb.append("        var Thread = Java.type('java.lang.Thread');\n");
+            sb.append("        var System = Java.type('java.lang.System');\n");
+            sb.append("        var startTime = System.currentTimeMillis();\n");
+            sb.append("        var attempts = 0;\n");
+            sb.append("        var rows = [];\n");
+            sb.append("        var matched = false;\n");
+            sb.append("        while (attempts < maxAttempts && (System.currentTimeMillis() - startTime) < timeoutMs) {\n");
+            sb.append("          attempts++;\n");
+            sb.append("          try {\n");
+            sb.append("            rows = dbQuery(cfg);\n");
+            sb.append("          } catch(e) {\n");
+            sb.append("            karate.log('DB Poll attempt ' + attempts + ' failed: ' + e.message);\n");
+            sb.append("            rows = [];\n");
+            sb.append("          }\n");
+            sb.append("          if (conditionFn(rows)) {\n");
+            sb.append("            matched = true;\n");
+            sb.append("            break;\n");
+            sb.append("          }\n");
+            sb.append("          if (attempts < maxAttempts && (System.currentTimeMillis() - startTime + intervalMs) < timeoutMs) {\n");
+            sb.append("            Thread.sleep(intervalMs);\n");
+            sb.append("          }\n");
+            sb.append("        }\n");
+            sb.append("        var latest = rows.length > 0 ? rows[0] : {};\n");
+            sb.append("        return {\n");
+            sb.append("          matched: matched,\n");
+            sb.append("          attempts: attempts,\n");
+            sb.append("          durationMs: System.currentTimeMillis() - startTime,\n");
+            sb.append("          rows: rows,\n");
+            sb.append("          row: latest,\n");
+            sb.append("          latestRow: latest\n");
+            sb.append("        };\n");
+            sb.append("      }\n");
+            sb.append("      \"\"\"\n");
+        }
+        sb.append("\n");
+
         int stepIdx = 1;
         for (WorkflowStep step : steps) {
             if (!step.isEnabled()) {
@@ -268,8 +377,37 @@ public class TestWorkflowService {
             } else if (step.getType() == StepType.TRANSFORM && step.getTransformConfig() != null) {
                 sb.append("    * def transformFn = ").append(step.getTransformConfig().getScript()).append("\n");
                 sb.append("    * def transformResult = transformFn(karate.get('context', {}))\n");
-            } else if (step.getType() == StepType.DB_POLL) {
-                sb.append("    # DB Polling Step: ").append(step.getName()).append("\n");
+            } else if (step.getType() == StepType.DB_POLL && step.getDbPollConfig() != null) {
+                DbPollStepConfig dbConfig = step.getDbPollConfig();
+                String safeStepId = step.getId() != null ? step.getId().replaceAll("[^a-zA-Z0-9_]", "_") : "db_poll";
+
+                Map<String, Object> cfgMap = new LinkedHashMap<>();
+                cfgMap.put("jdbcUrl", dbConfig.getJdbcUrl() != null ? dbConfig.getJdbcUrl() : "");
+                cfgMap.put("username", dbConfig.getUsername() != null ? dbConfig.getUsername() : "");
+                cfgMap.put("password", dbConfig.getPassword() != null ? dbConfig.getPassword() : "");
+                cfgMap.put("driverClassName", HikariConnectionPoolManager.detectDriverClassName(dbConfig.getJdbcUrl(), dbConfig.getDriverClassName()));
+                cfgMap.put("query", dbConfig.getQuery() != null ? dbConfig.getQuery() : "");
+
+                String cfgJson;
+                try {
+                    cfgJson = objectMapper.writeValueAsString(cfgMap);
+                } catch (Exception e) {
+                    cfgJson = "{}";
+                }
+
+                sb.append("    * def dbConfig_").append(safeStepId).append(" = ").append(cfgJson).append("\n");
+                sb.append("    * def dbCondition_").append(safeStepId).append(" = function(rows) { return rows.length > 0; }\n");
+
+                int maxAttempts = dbConfig.getMaxAttempts() != null && dbConfig.getMaxAttempts() > 0 ? dbConfig.getMaxAttempts() : 5;
+                long intervalMs = dbConfig.getPollIntervalMs() != null ? dbConfig.getPollIntervalMs() : 1000L;
+                long timeoutMs = dbConfig.getTimeoutMs() != null ? dbConfig.getTimeoutMs() : 15000L;
+
+                sb.append("    * def dbResult = dbPoll(dbConfig_").append(safeStepId).append(", ")
+                        .append(maxAttempts).append(", ").append(intervalMs).append(", ")
+                        .append(timeoutMs).append(", dbCondition_").append(safeStepId).append(")\n");
+                sb.append("    * def pollResult = dbResult\n");
+                sb.append("    * def result = dbResult\n");
+                sb.append("    * match dbResult.matched == true\n");
             }
             sb.append("\n");
         }

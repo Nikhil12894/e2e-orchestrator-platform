@@ -103,6 +103,55 @@ public class WorkflowFeaturesAndPortabilityTest {
         assertTrue(feature.contains("When method get"), "Method must be GET");
         assertTrue(feature.contains("Then status 200"), "Status check must exist");
         assertTrue(feature.contains("[MUTED / DISABLED] Scenario: Skipped Muted Step"), "Muted step should be commented out");
+        assertFalse(feature.contains("def dbQuery ="), "HTTP-only workflow must not emit dbQuery helper");
+        assertFalse(feature.contains("def dbPoll ="), "HTTP-only workflow must not emit dbPoll helper");
+    }
+
+    @Test
+    @DisplayName("Verify Standalone Karate .feature export generation for DB Poll steps (DBEXP-01..04)")
+    public void testStandaloneKarateFeatureExportDbPoll() {
+        WorkflowCreateRequest req = new WorkflowCreateRequest();
+        req.setName("DB Poll Export Flow");
+        req.setDescription("Tests .feature file generation for DB polling steps");
+
+        CanvasState state = new CanvasState();
+        CanvasNode dbNode = new CanvasNode();
+        dbNode.setId("step_db");
+        dbNode.setType("dbPoll");
+        dbNode.setPosition(new CanvasPosition(100, 100));
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("name", "Poll User Table");
+        data.put("jdbcUrl", "jdbc:h2:mem:export_test_db;DB_CLOSE_DELAY=-1");
+        data.put("username", "sa");
+        data.put("password", "");
+        data.put("driverClassName", "org.h2.Driver");
+        data.put("query", "SELECT id, status FROM users WHERE id = 1");
+        data.put("condition", "row.status == 'ACTIVE'");
+        data.put("maxAttempts", 3);
+        data.put("pollIntervalMs", 250L);
+        data.put("timeoutMs", 3000L);
+        dbNode.setData(data);
+
+        state.setNodes(List.of(dbNode));
+        req.setCanvasState(state);
+
+        TestWorkflowEntity wf = workflowService.createWorkflow(req);
+
+        String feature = workflowService.generateStandaloneKarateFeature(wf.getId());
+        assertNotNull(feature);
+
+        // DBEXP-01: Background contains self-contained JDBC functions
+        assertTrue(feature.contains("Java.type('java.sql.DriverManager')"), "Must use standard DriverManager");
+        assertTrue(feature.contains("def dbQuery ="), "Must define dbQuery helper");
+        assertTrue(feature.contains("def dbPoll ="), "Must define dbPoll helper");
+        assertFalse(feature.contains("Java.type('com.orchestrator.platform"), "Must not reference proprietary platform classes");
+
+        // DBEXP-02: Retry loop respecting maxAttempts and pollIntervalMs
+        assertTrue(feature.contains("dbPoll(dbConfig_step_db, 3, 250, 3000"), "Must pass retry parameters to dbPoll");
+
+        // DBEXP-03: Row match assertions
+        assertTrue(feature.contains("match dbResult.matched == true"), "Must assert matched == true");
     }
 
     @Test
