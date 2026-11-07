@@ -3,6 +3,7 @@ package com.orchestrator.platform.web;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +17,23 @@ import java.util.concurrent.ConcurrentHashMap;
 public class MockTargetApiController {
 
     private final Map<String, Map<String, Object>> mockOrders = new ConcurrentHashMap<>();
+
+    @PostMapping(value = "/auth/token", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    @Operation(summary = "OAuth2 / Form URL-Encoded token login", description = "Authenticates using application/x-www-form-urlencoded parameters and returns access token")
+    public ResponseEntity<Map<String, Object>> formLogin(@RequestParam(required = false) Map<String, String> formParams) {
+        String username = formParams != null && formParams.containsKey("username") ?
+                formParams.get("username") : "guest";
+        String grantType = formParams != null ? formParams.getOrDefault("grant_type", "password") : "password";
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("access_token", "mock-token-" + UUID.randomUUID().toString());
+        resp.put("token_type", "Bearer");
+        resp.put("expires_in", 3600);
+        resp.put("username", username);
+        resp.put("grant_type", grantType);
+        resp.put("received_fields", formParams != null ? formParams : Collections.emptyMap());
+        return ResponseEntity.ok(resp);
+    }
 
     @PostMapping("/auth/login")
     @Operation(summary = "Authenticate user", description = "Authenticates user and returns JWT access token")

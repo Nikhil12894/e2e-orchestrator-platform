@@ -15,7 +15,14 @@ Feature: Execute HTTP Request Step
     * url httpCfg.url
     * headers mergedHeaders
     * params httpCfg.params || {}
-    * def reqBody = (httpMethod == 'get' || httpMethod == 'delete') ? null : httpCfg.body
+
+    # Evaluate body type: Form URL-Encoded vs JSON
+    * def isForm = (httpCfg.bodyType == 'FORM_URL_ENCODED') || (mergedHeaders && (mergedHeaders['Content-Type'] == 'application/x-www-form-urlencoded' || mergedHeaders['content-type'] == 'application/x-www-form-urlencoded'))
+    * def formPayload = isForm ? (httpCfg.formData || httpCfg.body || {}) : null
+    * def reqBody = (!isForm && httpMethod != 'get' && httpMethod != 'delete') ? httpCfg.body : null
+
+    # Apply Karate keywords
+    * form fields formPayload
     * request reqBody
 
     # Configure Karate v2 Polling & Retry
@@ -40,5 +47,5 @@ Feature: Execute HTTP Request Step
     * match assertionPassed == true
 
     # Record Success to Bridge
-    * eval Bridge.onStepFinished(executionId, resolvedStep, true, responseStatus, httpCfg.body, response, extractedVars, assertionDetails, null, mergedHeaders)
+    * eval Bridge.onStepFinished(executionId, resolvedStep, true, responseStatus, isForm ? formPayload : httpCfg.body, response, extractedVars, assertionDetails, null, mergedHeaders)
 

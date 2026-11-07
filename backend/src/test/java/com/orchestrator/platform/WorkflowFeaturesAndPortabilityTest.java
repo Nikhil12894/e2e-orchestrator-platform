@@ -710,4 +710,46 @@ public class WorkflowFeaturesAndPortabilityTest {
         );
         assertEquals("jdbc:postgresql://stg-db.internal:5432/stg_orders?password=stg-vault-secret-999", resolvedJdbcUrl);
     }
+
+    @Test
+    @DisplayName("Verify in-memory dynamic execution of form url-encoded step against mock endpoint")
+    public void testDynamicKarateExecutionFormUrlEncoded() {
+        TestWorkflowEntity wf = new TestWorkflowEntity();
+        wf.setName("Dynamic Form Runner Test");
+        wf.setVersion(1);
+
+        WorkflowAst ast = new WorkflowAst();
+        WorkflowStep step = new WorkflowStep();
+        step.setId("step_form");
+        step.setName("OAuth Token Step");
+        step.setType(StepType.HTTP_REQUEST);
+        step.setEnabled(true);
+
+        HttpRequestStepConfig httpConfig = new HttpRequestStepConfig();
+        httpConfig.setUrl("http://localhost:" + port + "/api/v1/mock/auth/token");
+        httpConfig.setMethod("POST");
+        httpConfig.setBodyType("FORM_URL_ENCODED");
+        Map<String, Object> formFields = new LinkedHashMap<>();
+        formFields.put("username", "testuser");
+        formFields.put("grant_type", "client_credentials");
+        httpConfig.setFormData(formFields);
+        httpConfig.setExpectedStatus(200);
+        step.setHttpConfig(httpConfig);
+
+        ast.setSteps(List.of(step));
+        wf.setWorkflowAst(ast);
+        wf = workflowRepository.saveAndFlush(wf);
+
+        WorkflowExecutionEntity exec = new WorkflowExecutionEntity();
+        exec.setWorkflowId(wf.getId());
+        exec.setWorkflowName(wf.getName());
+        exec.setStatus(ExecutionStatus.PENDING);
+        exec = executionRepository.saveAndFlush(exec);
+
+        WorkflowExecutionEntity finished = karateRunner.executeWorkflow(exec, wf, new HashMap<>(), "default");
+        assertEquals(ExecutionStatus.COMPLETED, finished.getStatus());
+        assertNotNull(finished.getStepResults());
+        assertEquals(1, finished.getStepResults().size());
+        assertEquals(200, finished.getStepResults().get(0).getHttpStatus());
+    }
 }
