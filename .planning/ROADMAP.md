@@ -27,7 +27,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Standalone `.feature` file executes polling retries matching configured `pollIntervalMs` and `maxAttempts` until matching rows are returned or timeout is reached
   3. Standalone `.feature` file automatically asserts expected row counts and custom column condition expressions against query results
   4. Standalone `.feature` file captures extracted row values into Karate variables accessible to subsequent steps in the scenario
-**Plans:** 2/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 **Wave 1**
