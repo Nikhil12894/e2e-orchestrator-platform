@@ -46,7 +46,15 @@ Plans:
   2. User can add, edit, and delete form field key-value pairs with workflow variable expressions while the `Content-Type` header remains automatically synchronized
   3. Running a workflow with form-encoded HTTP steps executes via the dynamic Karate runner using native Karate form submission without errors
   4. Exporting a workflow with form-encoded HTTP steps produces standalone `.feature` scenarios using Karate's `form fields` syntax
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+**Wave 1**
+- [ ] 02-01-PLAN.md — Backend AST, Karate runtime & standalone exporter
+
+**Wave 2**
+- [ ] 02-02-PLAN.md — Frontend drawer UI & end-to-end verification
+
 **UI hint**: yes
 
 ## Progress
@@ -57,4 +65,4 @@ Phases execute in numeric order: 1 → 2
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Database Polling Standalone Karate Export | 2/2 | Complete | 2026-11-07 |
-| 2. Form URL-Encoded Requests End-to-End | 0/0 | Not started | - |
+| 2. Form URL-Encoded Requests End-to-End | 0/2 | Not started | - |
