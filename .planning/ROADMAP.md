@@ -13,7 +13,7 @@ This roadmap defines the delivery phases for achieving complete standalone Karat
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Database Polling Standalone Karate Export** - Export database polling workflow steps to self-contained standalone Karate features with JDBC querying, retries, assertions, and variable capture
-- [ ] **Phase 2: Form URL-Encoded Requests End-to-End** - Add visual configuration, dynamic runtime execution, and standalone export for application/x-www-form-urlencoded HTTP requests
+- [x] **Phase 2: Form URL-Encoded Requests End-to-End** - Add visual configuration, dynamic runtime execution, and standalone export for application/x-www-form-urlencoded HTTP requests (completed 2026-11-07)
 
 ## Phase Details
 
@@ -46,7 +46,7 @@ Plans:
   2. User can add, edit, and delete form field key-value pairs with workflow variable expressions while the `Content-Type` header remains automatically synchronized
   3. Running a workflow with form-encoded HTTP steps executes via the dynamic Karate runner using native Karate form submission without errors
   4. Exporting a workflow with form-encoded HTTP steps produces standalone `.feature` scenarios using Karate's `form fields` syntax
-**Plans:** 2/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 **Wave 1**
@@ -65,4 +65,4 @@ Phases execute in numeric order: 1 → 2
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Database Polling Standalone Karate Export | 2/2 | Complete | 2026-11-07 |
-| 2. Form URL-Encoded Requests End-to-End | 2/2 | In Progress | - |
+| 2. Form URL-Encoded Requests End-to-End | 2/2 | Complete    | 2026-11-07 |
