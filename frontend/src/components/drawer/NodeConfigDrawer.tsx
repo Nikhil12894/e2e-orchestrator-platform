@@ -24,7 +24,8 @@ import {
   Zap,
   Loader2,
   CheckCircle2,
-  XCircle
+  XCircle,
+  AlertCircle
 } from 'lucide-react';
 import { CanvasNode, CanvasNodeData, HttpMethod, StepAssertion, VariableExtraction } from '../../types/workflow';
 import { workflowApi } from '../../api/client';
@@ -107,6 +108,28 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
         });
     }
   }, [isOpen, isSubWorkflowNode, currentWorkflowId]);
+
+  // Form URL-Encoded parameter rows
+  const [formRows, setFormRows] = useState<Array<{ key: string; value: string }>>([]);
+
+  useEffect(() => {
+    const fd = selectedNode?.data?.formData;
+    if (fd && typeof fd === 'object') {
+      if (Array.isArray(fd)) {
+        setFormRows(fd.map((item: any) => ({
+          key: String(item?.key ?? ''),
+          value: String(item?.value ?? ''),
+        })));
+      } else {
+        setFormRows(Object.entries(fd).map(([k, v]) => ({
+          key: k,
+          value: String(v ?? ''),
+        })));
+      }
+    } else {
+      setFormRows([]);
+    }
+  }, [selectedNode?.id, isOpen]);
 
   if (!isOpen || !selectedNode) return null;
 
@@ -208,10 +231,60 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
     ...(envSecrets[currentEnv] || {}),
   };
 
+  const handleAddFormField = () => {
+    const updated = [...formRows, { key: '', value: '' }];
+    setFormRows(updated);
+  };
+
+  const handleUpdateFormRow = (index: number, field: 'key' | 'value', val: string) => {
+    const updated = [...formRows];
+    if (!updated[index]) return;
+    updated[index] = { ...updated[index], [field]: val };
+    setFormRows(updated);
+
+    const mapped: Record<string, string> = {};
+    updated.forEach((r) => {
+      const trimmedKey = r.key.trim();
+      if (trimmedKey) {
+        mapped[trimmedKey] = r.value;
+      }
+    });
+    update({ formData: mapped });
+  };
+
+  const handleDeleteFormRow = (index: number) => {
+    const updated = formRows.filter((_, i) => i !== index);
+    setFormRows(updated);
+
+    const mapped: Record<string, string> = {};
+    updated.forEach((r) => {
+      const trimmedKey = r.key.trim();
+      if (trimmedKey) {
+        mapped[trimmedKey] = r.value;
+      }
+    });
+    update({ formData: mapped });
+  };
+
+  const keyCounts = formRows.reduce((acc, r) => {
+    const k = r.key.trim();
+    if (k) {
+      acc[k] = (acc[k] || 0) + 1;
+    }
+    return acc;
+  }, {} as Record<string, number>);
+  const duplicateKeys = Object.keys(keyCounts).filter((k) => keyCounts[k] > 1);
+
   const handleInsertVariable = (varExpr: string) => {
     if (!varTargetField) return;
 
-    if (varTargetField === 'url') {
+    if (varTargetField.startsWith('formParam_')) {
+      const idx = parseInt(varTargetField.substring(10), 10);
+      if (!isNaN(idx) && formRows[idx]) {
+        const newVal = (formRows[idx]?.value || '') + varExpr;
+        handleUpdateFormRow(idx, 'value', newVal);
+      }
+    } else if (varTargetField === 'url') {
       update({ url: (data.url || '') + varExpr });
     } else if (varTargetField === 'jdbcUrl') {
       update({ jdbcUrl: (data.jdbcUrl || '') + varExpr });
@@ -845,6 +918,104 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                             rows={7}
                             className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-300 focus:outline-none focus:border-blue-500"
                           />
+                        </div>
+                      )}
+
+                      {/* URL-Encoded Form Table Editor */}
+                      {data.bodyType === 'FORM_URL_ENCODED' && (
+                        <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
+                          {/* Auto-Sync Callout Badge & Action CTA */}
+                          <div className="flex items-center justify-between">
+                            <span className="bg-sky-500/10 text-sky-400 border border-sky-500/30 text-[11px] font-mono py-1 px-2 rounded">
+                              Auto-synced: Content-Type: application/x-www-form-urlencoded
+                            </span>
+                            <button
+                              type="button"
+                              onClick={handleAddFormField}
+                              className="flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300 font-semibold"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              Add Form Field
+                            </button>
+                          </div>
+
+                          {/* Duplicate warning */}
+                          {duplicateKeys.length > 0 && (
+                            <div className="flex items-start gap-1.5 p-2 bg-rose-500/10 border border-rose-500/30 rounded-lg text-xs text-rose-400">
+                              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                              <span>
+                                Duplicate parameter key: Parameter keys must be unique. Combine multiple values or provide distinct parameter names before execution.
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Empty state card or Form Rows */}
+                          {formRows.length === 0 ? (
+                            <div className="text-center py-6 border border-dashed border-slate-800 rounded-lg">
+                              <p className="text-xs font-semibold text-slate-300 mb-1">No Form Parameters Configured</p>
+                              <p className="text-[11px] text-slate-500 max-w-xs mx-auto mb-3">
+                                Add key-value pairs below to construct an application/x-www-form-urlencoded request payload.
+                              </p>
+                              <button
+                                type="button"
+                                onClick={handleAddFormField}
+                                className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 rounded-lg text-xs font-medium"
+                              >
+                                Add Form Field
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                              {formRows.map((row, idx) => {
+                                const isDuplicate = duplicateKeys.includes(row.key.trim());
+                                const isBlankKeyWithVal = !row.key.trim() && !!row.value;
+                                return (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <input
+                                      type="text"
+                                      value={row.key}
+                                      placeholder="param_name"
+                                      onChange={(e) => handleUpdateFormRow(idx, 'key', e.target.value)}
+                                      className={`w-1/2 h-8 px-2 py-1 bg-slate-950 border rounded text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500 ${
+                                        isDuplicate
+                                          ? 'border-rose-500/60'
+                                          : isBlankKeyWithVal
+                                          ? 'border-rose-500/40'
+                                          : 'border-slate-800'
+                                      }`}
+                                    />
+                                    <div className="flex-1 relative">
+                                      <input
+                                        type="text"
+                                        value={row.value}
+                                        placeholder="value or ${var}"
+                                        onChange={(e) => handleUpdateFormRow(idx, 'value', e.target.value)}
+                                        className="w-full h-8 pr-8 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
+                                      />
+                                      <button
+                                        type="button"
+                                        aria-label="Insert variable into form parameter value"
+                                        title="Insert Variable"
+                                        onClick={() => openVarSelector(`formParam_${idx}`)}
+                                        className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center text-slate-500 hover:text-emerald-400"
+                                      >
+                                        <Variable className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      aria-label="Delete form parameter row"
+                                      title="Delete Row"
+                                      onClick={() => handleDeleteFormRow(idx)}
+                                      className="h-8 w-8 p-2 flex items-center justify-center text-slate-500 hover:text-rose-400"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
