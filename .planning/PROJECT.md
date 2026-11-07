@@ -36,9 +36,11 @@ Ensure complete functional parity and execution fidelity between visual workflow
 
 ## Context
 
-- `backend/src/main/java/com/orchestrator/platform/service/TestWorkflowService.java`: Currently emits `# DB Polling Step: <stepName>` as a comment line during standalone Karate export.
-- `backend/src/main/resources/karate/execute-http.feature`: Currently issues `* request reqBody` unconditionally, which fails or misformats `application/x-www-form-urlencoded` payloads that require Karate's native `* form fields` or `* form field`.
-- `frontend/src/components/drawer/NodeConfigDrawer.tsx`: Only supports a JSON textarea for request bodies.
+Shipped v1.0 milestone delivering standalone Karate database polling export and full-stack `application/x-www-form-urlencoded` HTTP request support.
+- Codebase state: 7 key files modified across backend and frontend (+1,123 / -40 lines).
+- Backend: Java 25 LTS, Spring Boot 4.1.2, Karate Core 2.1.4, HikariCP, PostgreSQL. `WorkflowFeaturesAndPortabilityTest` has 16/16 tests passing.
+- Frontend: React 18, TypeScript 5.6.3, @xyflow/react, Tailwind CSS, Vite (`tsc && vite build` passing with 0 errors).
+- Zero technical debt or verification gaps remaining. Future enhancements (multipart/form-data, raw query string editor, multi-table DB assertions) tracked for subsequent milestones.
 
 ## Constraints
 
@@ -72,4 +74,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-07 after Phase 2 (Milestone Complete)*
+*Last updated: 2026-11-07 after v1.0 milestone*
