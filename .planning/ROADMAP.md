@@ -12,7 +12,7 @@ This roadmap defines the delivery phases for achieving complete standalone Karat
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Database Polling Standalone Karate Export** - Export database polling workflow steps to self-contained standalone Karate features with JDBC querying, retries, assertions, and variable capture
+- [x] **Phase 1: Database Polling Standalone Karate Export** - Export database polling workflow steps to self-contained standalone Karate features with JDBC querying, retries, assertions, and variable capture
 - [ ] **Phase 2: Form URL-Encoded Requests End-to-End** - Add visual configuration, dynamic runtime execution, and standalone export for application/x-www-form-urlencoded HTTP requests
 
 ## Phase Details
@@ -27,14 +27,14 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Standalone `.feature` file executes polling retries matching configured `pollIntervalMs` and `maxAttempts` until matching rows are returned or timeout is reached
   3. Standalone `.feature` file automatically asserts expected row counts and custom column condition expressions against query results
   4. Standalone `.feature` file captures extracted row values into Karate variables accessible to subsequent steps in the scenario
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans executed
 
 Plans:
 **Wave 1**
 - [x] 01-01-PLAN.md — Standalone Karate feature exporter enhancement for DB polling steps
 
-**Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 01-02-PLAN.md — Standalone Karate execution and portability tests
+**Wave 2**
+- [x] 01-02-PLAN.md — Standalone Karate execution and portability tests
 
 ### Phase 2: Form URL-Encoded Requests End-to-End
 **Mode:** mvp
@@ -56,5 +56,5 @@ Phases execute in numeric order: 1 → 2
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Database Polling Standalone Karate Export | 1/2 | In Progress | - |
+| 1. Database Polling Standalone Karate Export | 2/2 | Complete | 2026-11-07 |
 | 2. Form URL-Encoded Requests End-to-End | 0/0 | Not started | - |
