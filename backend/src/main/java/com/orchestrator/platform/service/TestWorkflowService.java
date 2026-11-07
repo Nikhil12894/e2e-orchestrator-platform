@@ -396,7 +396,45 @@ public class TestWorkflowService {
                 }
 
                 sb.append("    * def dbConfig_").append(safeStepId).append(" = ").append(cfgJson).append("\n");
-                sb.append("    * def dbCondition_").append(safeStepId).append(" = function(rows) { return rows.length > 0; }\n");
+
+                // Condition function emission (safeguard: detect single equality vs compound/custom)
+                Integer expectedRowCount = dbConfig.getExpectedRowCount();
+                String condition = dbConfig.getCondition();
+
+                if (expectedRowCount != null) {
+                    sb.append("    * def dbCondition_").append(safeStepId)
+                            .append(" = function(rows) { return rows.length === ").append(expectedRowCount).append("; }\n");
+                } else if (condition != null && !condition.isBlank()) {
+                    String condTrimmed = condition.trim();
+                    if (!condTrimmed.contains("&&") && !condTrimmed.contains("||") && condTrimmed.matches("^\\s*(?:row\\.)?\\w+\\s*==\\s*[^=&|]+$")) {
+                        String[] parts = condTrimmed.split("==", 2);
+                        String field = cleanDbColumnPath(parts[0].trim());
+                        String expected = parts[1].trim();
+
+                        String expectedJs;
+                        if ((expected.startsWith("'") && expected.endsWith("'")) || (expected.startsWith("\"") && expected.endsWith("\""))) {
+                            expectedJs = expected;
+                        } else if (expected.equalsIgnoreCase("true") || expected.equalsIgnoreCase("false") || expected.equalsIgnoreCase("null")) {
+                            expectedJs = expected.toLowerCase();
+                        } else if (expected.matches("-?\\d+(\\.\\d+)?")) {
+                            expectedJs = expected;
+                        } else {
+                            expectedJs = "'" + expected.replace("'", "\\'") + "'";
+                        }
+
+                        sb.append("    * def dbCondition_").append(safeStepId)
+                                .append(" = function(rows) { if (rows.length === 0) return false; var r = rows[0]; var row = r; return (r['")
+                                .append(field).append("'] == ").append(expectedJs).append(" || r['")
+                                .append(field.toLowerCase()).append("'] == ").append(expectedJs).append("); }\n");
+                    } else {
+                        sb.append("    * def dbCondition_").append(safeStepId)
+                                .append(" = function(rows) { if (rows.length === 0) return false; var row = rows[0]; var r = row; return ")
+                                .append(condTrimmed).append("; }\n");
+                    }
+                } else {
+                    sb.append("    * def dbCondition_").append(safeStepId)
+                            .append(" = function(rows) { return rows.length > 0; }\n");
+                }
 
                 int maxAttempts = dbConfig.getMaxAttempts() != null && dbConfig.getMaxAttempts() > 0 ? dbConfig.getMaxAttempts() : 5;
                 long intervalMs = dbConfig.getPollIntervalMs() != null ? dbConfig.getPollIntervalMs() : 1000L;
@@ -408,11 +446,75 @@ public class TestWorkflowService {
                 sb.append("    * def pollResult = dbResult\n");
                 sb.append("    * def result = dbResult\n");
                 sb.append("    * match dbResult.matched == true\n");
+
+                if (expectedRowCount != null) {
+                    sb.append("    * match karate.sizeOf(dbResult.rows) == ").append(expectedRowCount).append("\n");
+                }
+
+                // Step-level Assertions
+                if (step.getAssertions() != null) {
+                    for (StepAssertion as : step.getAssertions()) {
+                        String f = as.getField() != null ? cleanDbColumnPath(as.getField()) : "";
+                        if (!f.isEmpty()) {
+                            String op = as.getOperator() != null ? as.getOperator().toUpperCase() : "EQUALS";
+                            Object exp = as.getExpectedValue();
+                            String expStr;
+                            if (exp instanceof Number || exp instanceof Boolean) {
+                                expStr = String.valueOf(exp);
+                            } else if (exp != null) {
+                                expStr = "'" + String.valueOf(exp).replace("'", "\\'") + "'";
+                            } else {
+                                expStr = "null";
+                            }
+
+                            switch (op) {
+                                case "EQUALS" -> sb.append("    * match dbResult.rows[0].").append(f).append(" == ").append(expStr).append("\n");
+                                case "NOT_EQUALS" -> sb.append("    * match dbResult.rows[0].").append(f).append(" != ").append(expStr).append("\n");
+                                case "CONTAINS" -> sb.append("    * match dbResult.rows[0].").append(f).append(" contains ").append(expStr).append("\n");
+                                case "GREATER_THAN" -> sb.append("    * match dbResult.rows[0].").append(f).append(" > ").append(expStr).append("\n");
+                                case "LESS_THAN" -> sb.append("    * match dbResult.rows[0].").append(f).append(" < ").append(expStr).append("\n");
+                                case "MATCHES_REGEX" -> sb.append("    * match dbResult.rows[0].").append(f).append(" == '#? ' + ").append(expStr).append("\n");
+                                case "IS_NOT_NULL" -> sb.append("    * match dbResult.rows[0].").append(f).append(" == '#present'\n");
+                                default -> sb.append("    * match dbResult.rows[0].").append(f).append(" == ").append(expStr).append("\n");
+                            }
+                        }
+                    }
+                }
+
+                // Variable Extractions (gated on DB_ROW_COLUMN or DB_COLUMN per review instruction 2)
+                if (step.getExtractions() != null) {
+                    for (VariableExtraction ext : step.getExtractions()) {
+                        String src = ext.getSource();
+                        if (src == null || src.isBlank() || "DB_ROW_COLUMN".equalsIgnoreCase(src) || "DB_COLUMN".equalsIgnoreCase(src)) {
+                            String varName = ext.getVariableName();
+                            String path = cleanDbColumnPath(ext.getJsonPath());
+                            if (varName != null && !varName.isBlank() && !path.isBlank()) {
+                                sb.append("    * def ").append(varName).append(" = dbResult.rows[0].").append(path).append("\n");
+                            }
+                        }
+                    }
+                }
             }
             sb.append("\n");
         }
 
         return sb.toString();
+    }
+
+    private String cleanDbColumnPath(String jsonPath) {
+        if (jsonPath == null) return "";
+        String cleanPath = jsonPath.trim();
+        if (cleanPath.startsWith("$.")) {
+            cleanPath = cleanPath.substring(2);
+        } else if (cleanPath.startsWith("$")) {
+            cleanPath = cleanPath.substring(1);
+        }
+        if (cleanPath.startsWith("row.")) {
+            cleanPath = cleanPath.substring(4);
+        } else if (cleanPath.startsWith("latestRow.")) {
+            cleanPath = cleanPath.substring(10);
+        }
+        return cleanPath;
     }
 
     @Transactional
@@ -584,6 +686,11 @@ public class TestWorkflowService {
             } else if (data.get("retryCount") != null) {
                 try {
                     dbConfig.setMaxAttempts(Integer.parseInt(String.valueOf(data.get("retryCount"))));
+                } catch (Exception ignored) {}
+            }
+            if (data.get("expectedRowCount") != null) {
+                try {
+                    dbConfig.setExpectedRowCount(Integer.parseInt(String.valueOf(data.get("expectedRowCount"))));
                 } catch (Exception ignored) {}
             }
             step.setDbPollConfig(dbConfig);

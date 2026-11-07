@@ -131,9 +131,40 @@ public class WorkflowFeaturesAndPortabilityTest {
         data.put("maxAttempts", 3);
         data.put("pollIntervalMs", 250L);
         data.put("timeoutMs", 3000L);
+        data.put("extractions", List.of(
+                Map.of("variableName", "userStatus", "source", "DB_ROW_COLUMN", "jsonPath", "status"),
+                Map.of("variableName", "userId", "source", "DB_ROW_COLUMN", "jsonPath", "$.id")
+        ));
+        data.put("assertions", List.of(
+                Map.of("field", "status", "operator", "EQUALS", "expectedValue", "ACTIVE")
+        ));
         dbNode.setData(data);
 
-        state.setNodes(List.of(dbNode));
+        // Node 2: DB Poll with expectedRowCount
+        CanvasNode dbNode2 = new CanvasNode();
+        dbNode2.setId("step_db_count");
+        dbNode2.setType("dbPoll");
+        dbNode2.setPosition(new CanvasPosition(100, 250));
+        Map<String, Object> data2 = new HashMap<>();
+        data2.put("name", "Poll Row Count");
+        data2.put("jdbcUrl", "jdbc:h2:mem:export_test_db;DB_CLOSE_DELAY=-1");
+        data2.put("query", "SELECT * FROM orders");
+        data2.put("expectedRowCount", 5);
+        dbNode2.setData(data2);
+
+        // Node 3: DB Poll with compound condition (safeguard against == split corruption)
+        CanvasNode dbNode3 = new CanvasNode();
+        dbNode3.setId("step_db_compound");
+        dbNode3.setType("dbPoll");
+        dbNode3.setPosition(new CanvasPosition(100, 400));
+        Map<String, Object> data3 = new HashMap<>();
+        data3.put("name", "Poll Compound Condition");
+        data3.put("jdbcUrl", "jdbc:h2:mem:export_test_db;DB_CLOSE_DELAY=-1");
+        data3.put("query", "SELECT status, retry_count FROM tasks WHERE id = 10");
+        data3.put("condition", "row.status == 'COMPLETED' && row.retry_count > 2");
+        dbNode3.setData(data3);
+
+        state.setNodes(List.of(dbNode, dbNode2, dbNode3));
         req.setCanvasState(state);
 
         TestWorkflowEntity wf = workflowService.createWorkflow(req);
@@ -146,12 +177,26 @@ public class WorkflowFeaturesAndPortabilityTest {
         assertTrue(feature.contains("def dbQuery ="), "Must define dbQuery helper");
         assertTrue(feature.contains("def dbPoll ="), "Must define dbPoll helper");
         assertFalse(feature.contains("Java.type('com.orchestrator.platform"), "Must not reference proprietary platform classes");
+        assertTrue(feature.contains("str.replace(/\\$\\{([^}]+)\\}/g"), "Must contain token replacer regex");
 
-        // DBEXP-02: Retry loop respecting maxAttempts and pollIntervalMs
+        // DBEXP-02: Retry loop respecting maxAttempts, pollIntervalMs, and timeoutMs
         assertTrue(feature.contains("dbPoll(dbConfig_step_db, 3, 250, 3000"), "Must pass retry parameters to dbPoll");
 
-        // DBEXP-03: Row match assertions
+        // DBEXP-03: Row match assertions and condition generation
         assertTrue(feature.contains("match dbResult.matched == true"), "Must assert matched == true");
+        assertTrue(feature.contains("match dbResult.rows[0].status == 'ACTIVE'"), "Must assert column equality");
+        assertTrue(feature.contains("return rows.length === 5;"), "Must emit expectedRowCount condition function");
+        assertTrue(feature.contains("match karate.sizeOf(dbResult.rows) == 5"), "Must assert expectedRowCount");
+
+        // Condition safeguard: Compound condition preserves expression without corrupted split
+        assertTrue(feature.contains("return row.status == 'COMPLETED' && row.retry_count > 2;"),
+                "Compound condition must evaluate directly without reference errors");
+
+        // DBEXP-04: Variable extractions
+        assertTrue(feature.contains("def userStatus = dbResult.rows[0].status"), "Must extract status column");
+        assertTrue(feature.contains("def userId = dbResult.rows[0].id"), "Must extract stripped id column");
+        assertTrue(feature.contains("def pollResult = dbResult"), "Must alias pollResult");
+        assertTrue(feature.contains("def result = dbResult"), "Must alias result");
     }
 
     @Test
