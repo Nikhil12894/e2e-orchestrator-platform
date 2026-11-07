@@ -21,6 +21,8 @@ import com.orchestrator.platform.service.TestWorkflowService;
 import com.orchestrator.platform.service.WorkflowContextEngine;
 import com.orchestrator.platform.service.execution.DynamicKarateRunner;
 import com.orchestrator.platform.service.execution.ExecutionLogBroadcaster;
+import io.karatelabs.core.Runner;
+import io.karatelabs.core.SuiteResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +30,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -197,6 +204,75 @@ public class WorkflowFeaturesAndPortabilityTest {
         assertTrue(feature.contains("def userId = dbResult.rows[0].id"), "Must extract stripped id column");
         assertTrue(feature.contains("def pollResult = dbResult"), "Must alias pollResult");
         assertTrue(feature.contains("def result = dbResult"), "Must alias result");
+    }
+
+    @Test
+    @DisplayName("Verify Standalone exported Karate feature executes cleanly through Karate Runner.path (Task 1)")
+    public void testStandaloneKarateFeatureExecutionStandalone() throws Exception {
+        // 1. Initialize an in-memory H2 database table (orders) per D-01..D-04
+        try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:standalone_exec_db;DB_CLOSE_DELAY=-1", "sa", "")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("CREATE TABLE IF NOT EXISTS orders (id INT PRIMARY KEY, status VARCHAR(50), total DECIMAL(10,2))");
+                stmt.execute("DELETE FROM orders WHERE id = 501");
+                stmt.execute("INSERT INTO orders VALUES (501, 'COMPLETED', 129.50)");
+            }
+        }
+
+        // 2. Construct and save a workflow via workflowService.createWorkflow containing a dbPoll step
+        WorkflowCreateRequest req = new WorkflowCreateRequest();
+        req.setName("Standalone Runner Parity Test");
+
+        CanvasState state = new CanvasState();
+        CanvasNode dbNode = new CanvasNode();
+        dbNode.setId("step_db_run");
+        dbNode.setType("dbPoll");
+        dbNode.setPosition(new CanvasPosition(100, 100));
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("name", "Fetch Order DB");
+        data.put("jdbcUrl", "jdbc:h2:mem:standalone_exec_db;DB_CLOSE_DELAY=-1");
+        data.put("username", "sa");
+        data.put("password", "");
+        data.put("driverClassName", "org.h2.Driver");
+        data.put("query", "SELECT id, status, total FROM orders WHERE id = 501");
+        data.put("condition", "row.status == 'COMPLETED'");
+        data.put("maxAttempts", 2);
+        data.put("pollIntervalMs", 100L);
+        data.put("timeoutMs", 2000L);
+        data.put("extractions", List.of(
+                Map.of("variableName", "extractedTotal", "source", "DB_ROW_COLUMN", "jsonPath", "total")
+        ));
+        data.put("assertions", List.of(
+                Map.of("field", "status", "operator", "EQUALS", "expectedValue", "COMPLETED"),
+                Map.of("field", "total", "operator", "EQUALS", "expectedValue", 129.50)
+        ));
+        dbNode.setData(data);
+        state.setNodes(List.of(dbNode));
+        req.setCanvasState(state);
+
+        TestWorkflowEntity wf = workflowService.createWorkflow(req);
+
+        // 3. Call workflowService.generateStandaloneKarateFeature(wf.getId())
+        String featureContent = workflowService.generateStandaloneKarateFeature(wf.getId());
+        assertNotNull(featureContent);
+
+        // 4. Write the feature content to a temporary file
+        Path tempFeature = Files.createTempFile("standalone-db-test-", ".feature");
+        try {
+            Files.writeString(tempFeature, featureContent, StandardCharsets.UTF_8);
+
+            // 5. Execute using standard Karate Core runner per D-01..D-04
+            SuiteResult results = Runner.path(tempFeature.toAbsolutePath().toString())
+                    .outputHtmlReport(false)
+                    .parallel(1);
+
+            // 6. Assert results per special review instructions and SuiteResult API
+            assertFalse(results.isFailed(), "Execution failed: " + (results.getErrors() != null ? String.join("\n", results.getErrors()) : ""));
+            assertEquals(0, results.getScenarioFailedCount(), "Expected 0 failed scenarios");
+            assertTrue(results.getErrors() == null || results.getErrors().isEmpty(), "Expected no errors");
+        } finally {
+            Files.deleteIfExists(tempFeature);
+        }
     }
 
     @Test
