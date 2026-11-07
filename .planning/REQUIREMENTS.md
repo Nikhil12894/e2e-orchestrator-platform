@@ -9,10 +9,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Database Polling Karate Export
 
-- [ ] **DBEXP-01**: Standalone Karate feature exporter generates self-contained inline JDBC functions using `java.sql.DriverManager` in the feature Background instead of a comment placeholder.
-- [ ] **DBEXP-02**: Standalone Karate export includes database polling retry loops respecting `pollIntervalMs` and `maxAttempts` from the visual step configuration.
-- [ ] **DBEXP-03**: Standalone Karate export generates automated assertions validating expected row counts or custom SQL column conditions (`row.status == 'COMPLETED'`).
-- [ ] **DBEXP-04**: Standalone Karate export generates variable extraction statements from matched database query rows (`* def var = result.rows[0].col`) for downstream steps.
+- [x] **DBEXP-01**: Standalone Karate feature exporter generates self-contained inline JDBC functions using `java.sql.DriverManager` in the feature Background instead of a comment placeholder.
+- [x] **DBEXP-02**: Standalone Karate export includes database polling retry loops respecting `pollIntervalMs` and `maxAttempts` from the visual step configuration.
+- [x] **DBEXP-03**: Standalone Karate export generates automated assertions validating expected row counts or custom SQL column conditions (`row.status == 'COMPLETED'`).
+- [x] **DBEXP-04**: Standalone Karate export generates variable extraction statements from matched database query rows (`* def var = result.rows[0].col`) for downstream steps.
 
 ### HTTP Form URL-Encoded Requests
 
@@ -50,10 +50,10 @@ Which phases cover which requirements. Populated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DBEXP-01 | Phase 1 | Pending |
-| DBEXP-02 | Phase 1 | Pending |
-| DBEXP-03 | Phase 1 | Pending |
-| DBEXP-04 | Phase 1 | Pending |
+| DBEXP-01 | Phase 1 | Complete |
+| DBEXP-02 | Phase 1 | Complete |
+| DBEXP-03 | Phase 1 | Complete |
+| DBEXP-04 | Phase 1 | Complete |
 | FORM-01 | Phase 2 | Pending |
 | FORM-02 | Phase 2 | Pending |
 | FORM-03 | Phase 2 | Pending |

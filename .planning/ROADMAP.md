@@ -27,11 +27,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Standalone `.feature` file executes polling retries matching configured `pollIntervalMs` and `maxAttempts` until matching rows are returned or timeout is reached
   3. Standalone `.feature` file automatically asserts expected row counts and custom column condition expressions against query results
   4. Standalone `.feature` file captures extracted row values into Karate variables accessible to subsequent steps in the scenario
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 01-01-PLAN.md — Standalone Karate feature exporter enhancement for DB polling steps
+- [x] 01-01-PLAN.md — Standalone Karate feature exporter enhancement for DB polling steps
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 01-02-PLAN.md — Standalone Karate execution and portability tests
@@ -56,5 +56,5 @@ Phases execute in numeric order: 1 → 2
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Database Polling Standalone Karate Export | 0/2 | Not started | - |
+| 1. Database Polling Standalone Karate Export | 1/2 | In Progress | - |
 | 2. Form URL-Encoded Requests End-to-End | 0/0 | Not started | - |
