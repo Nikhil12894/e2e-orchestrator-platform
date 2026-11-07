@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 milestone: v1.1
 milestone_name: Execution Status & Report URLs for cURL / CI/CD
 status: planning
-last_updated: "2026-11-07T15:48:52.737Z"
+last_updated: "2026-11-07T15:56:00.000Z"
 last_activity: 2026-11-07
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -19,46 +19,37 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-11-07)
 
-**Core value:** Ensure complete functional parity and execution fidelity between visual workflows, dynamic in-memory Karate execution, and standalone exported Karate `.feature` files for all step types including database polling and form-parameter HTTP requests.
-**Current focus:** Planning next milestone
+**Core value:** Ensure complete functional parity and execution fidelity between visual workflows, dynamic in-memory Karate execution, and standalone exported Karate `.feature` files, while providing frictionless execution status tracking and direct HTML report access for automated pipelines and terminal users.
+**Current focus:** Phase 3: Execution Tracking Navigation URLs
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-11-07 — Milestone v1.1 started
+Phase: Phase 3 of 5 (Execution Tracking Navigation URLs)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-11-07 — Milestone v1.1 roadmap created (Phases 3-5)
 
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: 9.6 min
-- Total execution time: 0.44 hours
+- Total plans completed: 4
+- Average duration: 7.7 min
+- Total execution time: 0.52 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1. Database Polling Standalone Karate Export | 2 | 22 min | 11 min |
-| 2. Form URL-Encoded Requests End-to-End | 1 | 4 min | 4 min |
-| 1 | 2 | - | - |
-| 2 | 2 | - | - |
+| 2. Form URL-Encoded Requests End-to-End | 2 | 9 min | 4.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (10 min), 01-02 (12 min), 02-01 (4 min)
+- Last 4 plans: 01-01 (10 min), 01-02 (12 min), 02-01 (4 min), 02-02 (5 min)
 - Trend: Stable
 
 *Updated after each plan completion*
-**Per-Plan Metrics:**
-
-| Plan | Duration | Tasks | Files |
-|------|----------|-------|-------|
-| Phase 01 P01 | 10 min | 2 tasks | 2 files |
-| Phase 01 P02 | 12 min | 2 tasks | 2 files |
-| Phase 02 P01 | 4 min | 2 tasks | 5 files |
-| Phase 2 P02 | 5 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -67,19 +58,10 @@ Last activity: 2026-11-07 — Milestone v1.1 started
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- [Milestone Initialization]: Use self-contained inline JDBC functions in exported Karate Background to avoid requiring orchestrator classes on external classpaths.
-- [Milestone Initialization]: Introduce Body Type selector with key-value table editor for x-www-form-urlencoded payloads in NodeConfigDrawer.
-- [Milestone Initialization]: Use Karate native `form fields` keyword in both runtime `execute-http.feature` and standalone export generator.
-- [Phase 01]: D-01: Self-contained inline JDBC functions in Background (dbQuery and dbPoll) using java.sql.DriverManager
-- [Phase 01]: D-02: Retry loop respecting maxAttempts, pollIntervalMs, and timeoutMs with Thread.sleep
-- [Phase 01]: D-03: Dual-case field equality condition evaluator and column match assertions
-- [Phase 01]: D-04: Variable extractions aliasing pollResult and result to dbResult for downstream steps
-- [Phase 01]: D-05: Unified Scenario: Execute Workflow Steps in standalone export to enable natural variable scope sharing across steps without platform dependencies
-- [Phase 01]: D-06: formatKarateExpression helper converting ${var}, ${$env:VAR}, and ${$secret:VAR} into dynamic JavaScript string concatenation for HTTP URLs and headers
-- [Phase 02]: D-07: Annotate HttpRequestStepConfig with @JsonIgnoreProperties(ignoreUnknown = true) and @JsonIgnore on isFormEncoded() to avoid persisting pseudo-property to JSONB
-- [Phase 02]: D-08: Use Karate native form fields and request keyword semantics in execute-http.feature ensuring formPayload populates MultiPartBuilder without raw JSON body conflict
-- [Phase 2]: Store form parameters in local component array state formRows to allow duplicate/empty keys during user editing before serializing to formData
-- [Phase 2]: Auto-synchronize Content-Type header when toggling bodyType, reverting to application/json only if it was application/x-www-form-urlencoded
+- [v1.0 Milestone]: Self-contained inline JDBC functions in Background (dbQuery and dbPoll) using java.sql.DriverManager
+- [v1.0 Milestone]: Key-value table editor with raw mode in UI drawer for form parameters
+- [v1.0 Milestone]: Native Karate form fields keyword in execution & standalone feature export
+- [Phase 03]: Absolute navigation URLs (statusUrl, reportUrl, streamUrl) to be computed dynamically from request origin/host headers
 
 ### Pending Todos
 
@@ -99,10 +81,10 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-07T04:56:34.891Z
-Stopped at: Phase 2 complete — all phases complete
+Last session: 2026-11-07
+Stopped at: Milestone v1.1 roadmap created
 Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Plan Phase 3 with `/gsd-plan-phase 3`
