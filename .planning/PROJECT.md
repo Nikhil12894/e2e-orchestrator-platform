@@ -20,13 +20,14 @@ Ensure complete functional parity and execution fidelity between visual workflow
 - ✓ Kafka consumer assertion steps for event-driven testing — existing
 - ✓ Real-time execution logs and progress streaming via WebSocket STOMP and SSE — existing
 - ✓ Standalone Karate `.feature` file export for HTTP, delay, and transform steps — existing
+- ✓ **Karate Feature Export for DB Poll Steps**: Export executable database polling steps in standalone `.feature` files utilizing self-contained inline JDBC functions (`java.sql.DriverManager`), supporting retry loops, expected row counts, custom SQL conditions, and downstream variable extraction without requiring proprietary platform classes on external classpaths — Phase 1
+- ✓ **HTTP Form URL-Encoded Configuration Drawer**: Add a Request Body Type toggle (`JSON` vs `x-www-form-urlencoded`) in the visual node drawer when method is `POST`, `PUT`, or `PATCH`, with an interactive key-value table editor, variable injection, and automatic `Content-Type: application/x-www-form-urlencoded` header synchronization — Phase 2
+- ✓ **HTTP Form URL-Encoded AST & Execution**: Enhance `HttpRequestStepConfig` with body type support and update `execute-http.feature` to natively invoke Karate's `form fields` keyword instead of `request` when sending form-encoded requests — Phase 2
+- ✓ **HTTP Form URL-Encoded Standalone Export**: Update `TestWorkflowService.generateStandaloneKarateFeature()` to emit native Karate `form fields` syntax when exporting form-encoded HTTP steps — Phase 2
 
 ### Active
 
-- [ ] **Karate Feature Export for DB Poll Steps**: Export executable database polling steps in standalone `.feature` files utilizing self-contained inline JDBC functions (`java.sql.DriverManager`), supporting retry loops, expected row counts, custom SQL conditions, and downstream variable extraction without requiring proprietary platform classes on external classpaths.
-- [ ] **HTTP Form URL-Encoded Configuration Drawer**: Add a Request Body Type toggle (`JSON` vs `x-www-form-urlencoded`) in the visual node drawer when method is `POST`, `PUT`, or `PATCH`, with an interactive key-value table editor, variable injection, and automatic `Content-Type: application/x-www-form-urlencoded` header synchronization.
-- [ ] **HTTP Form URL-Encoded AST & Execution**: Enhance `HttpRequestStepConfig` with body type support and update `execute-http.feature` to natively invoke Karate's `form fields` keyword instead of `request` when sending form-encoded requests.
-- [ ] **HTTP Form URL-Encoded Standalone Export**: Update `TestWorkflowService.generateStandaloneKarateFeature()` to emit native Karate `form fields` syntax when exporting form-encoded HTTP steps.
+*(All milestone requirements complete)*
 
 ### Out of Scope
 
@@ -49,9 +50,9 @@ Ensure complete functional parity and execution fidelity between visual workflow
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Self-contained inline JDBC helper for exported DB steps | Eliminates custom classpath dependencies so exported `.feature` files run in any standard Karate setup with JDBC driver | — Pending |
-| Key-value table editor with raw mode in UI drawer | Provides clean developer experience for form parameters while retaining variable insertion capabilities | — Pending |
-| Native Karate `form fields` keyword in execution & export | Conforms to Karate's built-in URL-encoding behavior and automatic header handling | — Pending |
+| Self-contained inline JDBC helper for exported DB steps | Eliminates custom classpath dependencies so exported `.feature` files run in any standard Karate setup with JDBC driver | ✓ Validated in Phase 1 |
+| Key-value table editor with raw mode in UI drawer | Provides clean developer experience for form parameters while retaining variable insertion capabilities | ✓ Validated in Phase 2 |
+| Native Karate `form fields` keyword in execution & export | Conforms to Karate's built-in URL-encoding behavior and automatic header handling | ✓ Validated in Phase 2 |
 
 ## Evolution
 
@@ -71,4 +72,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-06 after initialization*
+*Last updated: 2026-11-07 after Phase 2 (Milestone Complete)*
