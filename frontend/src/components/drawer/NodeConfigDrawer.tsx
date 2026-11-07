@@ -247,6 +247,21 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
     }
   };
 
+  const handleSelectBodyType = (type: 'JSON' | 'FORM_URL_ENCODED') => {
+    const currentHeaders = { ...(data.headers || {}) };
+    if (type === 'FORM_URL_ENCODED') {
+      currentHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+    } else {
+      if (currentHeaders['Content-Type'] === 'application/x-www-form-urlencoded') {
+        currentHeaders['Content-Type'] = 'application/json';
+      }
+    }
+    update({
+      bodyType: type,
+      headers: currentHeaders,
+    });
+  };
+
   const handleTestDbConnection = async () => {
     if (!data.jdbcUrl) return;
     setIsTestingDb(true);
@@ -770,33 +785,68 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                     </div>
                   </div>
 
-                  {/* JSON Body editor */}
+                  {/* Request Body Configuration (POST, PUT, PATCH only) */}
                   {(data.method === 'POST' || data.method === 'PUT' || data.method === 'PATCH') && (
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-[11px] font-medium text-slate-300">Request Body (JSON)</label>
-                        <button
-                          type="button"
-                          onClick={() => openVarSelector('body')}
-                          className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300"
-                        >
-                          <Variable className="w-3 h-3" />
-                          Insert Variable
-                        </button>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
+                          Request Body Format
+                        </label>
+                        <div className="grid grid-cols-2 gap-1 p-1 bg-slate-900 border border-slate-800 rounded-lg">
+                          <button
+                            type="button"
+                            onClick={() => handleSelectBodyType('JSON')}
+                            className={`py-1.5 px-3 rounded-md text-xs transition-all ${
+                              (!data.bodyType || data.bodyType === 'JSON')
+                                ? 'bg-blue-600/20 text-blue-300 border border-blue-500 font-semibold'
+                                : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                          >
+                            JSON Body
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectBodyType('FORM_URL_ENCODED')}
+                            className={`py-1.5 px-3 rounded-md text-xs transition-all ${
+                              data.bodyType === 'FORM_URL_ENCODED'
+                                ? 'bg-blue-600/20 text-blue-300 border border-blue-500 font-semibold'
+                                : 'text-slate-400 hover:text-slate-200'
+                            }`}
+                          >
+                            URL-Encoded Form
+                          </button>
+                        </div>
                       </div>
-                      <textarea
-                        value={typeof data.body === 'object' ? JSON.stringify(data.body, null, 2) : data.body || ''}
-                        onChange={(e) => {
-                          try {
-                            const parsed = JSON.parse(e.target.value);
-                            update({ body: parsed });
-                          } catch {
-                            update({ body: e.target.value });
-                          }
-                        }}
-                        rows={7}
-                        className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-300 focus:outline-none focus:border-blue-500"
-                      />
+
+                      {/* JSON Body editor */}
+                      {(!data.bodyType || data.bodyType === 'JSON') && (
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[11px] font-medium text-slate-300">Request Body (JSON)</label>
+                            <button
+                              type="button"
+                              onClick={() => openVarSelector('body')}
+                              className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300"
+                            >
+                              <Variable className="w-3 h-3" />
+                              Insert Variable
+                            </button>
+                          </div>
+                          <textarea
+                            value={typeof data.body === 'object' ? JSON.stringify(data.body, null, 2) : data.body || ''}
+                            onChange={(e) => {
+                              try {
+                                const parsed = JSON.parse(e.target.value);
+                                update({ body: parsed });
+                              } catch {
+                                update({ body: e.target.value });
+                              }
+                            }}
+                            rows={7}
+                            className="w-full p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-300 focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </>

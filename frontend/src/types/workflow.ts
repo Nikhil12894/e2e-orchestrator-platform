@@ -48,6 +48,8 @@ export interface HttpRequestStepConfig {
   excludedGlobalHeaders?: string[];
   params?: Record<string, string>;
   body?: any;
+  bodyType?: 'JSON' | 'FORM_URL_ENCODED';
+  formData?: Record<string, any>;
   expectedStatus?: number;
   timeoutMs?: number;
   retryCount?: number;
@@ -133,6 +135,8 @@ export interface CanvasNodeData {
   excludedGlobalHeaders?: string[];
   params?: Record<string, string>;
   body?: any;
+  bodyType?: 'JSON' | 'FORM_URL_ENCODED';
+  formData?: Record<string, any>;
   expectedStatus?: number;
   jdbcUrl?: string;
   username?: string;
