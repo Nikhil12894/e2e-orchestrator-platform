@@ -50,7 +50,7 @@ Plans:
 
 Plans:
 **Wave 1**
-- [ ] 02-01-PLAN.md — Backend AST, Karate runtime & standalone exporter
+- [x] 02-01-PLAN.md — Backend AST, Karate runtime & standalone exporter
 
 **Wave 2**
 - [ ] 02-02-PLAN.md — Frontend drawer UI & end-to-end verification
@@ -65,4 +65,4 @@ Phases execute in numeric order: 1 → 2
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Database Polling Standalone Karate Export | 2/2 | Complete | 2026-11-07 |
-| 2. Form URL-Encoded Requests End-to-End | 0/2 | Not started | - |
+| 2. Form URL-Encoded Requests End-to-End | 1/2 | In progress | - |

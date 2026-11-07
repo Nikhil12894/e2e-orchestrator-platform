@@ -18,8 +18,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **FORM-01**: Node Configuration Drawer provides a Body Type selector (`JSON` vs `x-www-form-urlencoded`) when HTTP method is `POST`, `PUT`, or `PATCH`.
 - [ ] **FORM-02**: Node Configuration Drawer provides an interactive key-value table editor supporting parameter key/value pairs, variable insertion (`${var}`), and auto-synchronizing `Content-Type: application/x-www-form-urlencoded`.
-- [ ] **FORM-03**: Dynamic Karate execution engine (`execute-http.feature`) branches on form-encoded body type to natively invoke Karate's `form fields` keyword without passing a raw JSON `request` body.
-- [ ] **FORM-04**: Standalone Karate feature exporter generates native `form fields <payload>` statements instead of `request` when exporting form-encoded HTTP steps.
+- [x] **FORM-03**: Dynamic Karate execution engine (`execute-http.feature`) branches on form-encoded body type to natively invoke Karate's `form fields` keyword without passing a raw JSON `request` body.
+- [x] **FORM-04**: Standalone Karate feature exporter generates native `form fields <payload>` statements instead of `request` when exporting form-encoded HTTP steps.
 
 ## v2 Requirements
 
@@ -56,8 +56,8 @@ Which phases cover which requirements. Populated during roadmap creation.
 | DBEXP-04 | Phase 1 | Complete |
 | FORM-01 | Phase 2 | Pending |
 | FORM-02 | Phase 2 | Pending |
-| FORM-03 | Phase 2 | Pending |
-| FORM-04 | Phase 2 | Pending |
+| FORM-03 | Phase 2 | Complete |
+| FORM-04 | Phase 2 | Complete |
 
 **Coverage:**
 - v1 requirements: 8 total
