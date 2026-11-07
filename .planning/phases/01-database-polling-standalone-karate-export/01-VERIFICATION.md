@@ -1,6 +1,6 @@
 ---
 phase: 01-database-polling-standalone-karate-export
-verified: 2026-11-07T02:22:53Z
+verified: 2026-11-07T06:14:00Z
 status: passed
 score: 7/7 must-haves verified
 covered_files:
@@ -10,7 +10,7 @@ covered_files:
   - .planning/phases/01-database-polling-standalone-karate-export/01-02-SUMMARY.md
   - backend/src/main/java/com/orchestrator/platform/service/TestWorkflowService.java
   - backend/src/test/java/com/orchestrator/platform/WorkflowFeaturesAndPortabilityTest.java
-covered_digest: "v4:sha256:d973d144133a653def85de46df1705231f89885acaba9c4d500b32a43e53b0a5"
+covered_digest: "v4:sha256:c9435abe3147e8035ea09c7d429fbf051725ad2c7d67d84bc6a342686d81f5bb"
 behavior_unverified: 0
 overrides_applied: 0
 ---
