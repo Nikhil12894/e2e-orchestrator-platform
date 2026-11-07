@@ -9,6 +9,7 @@ import com.orchestrator.platform.domain.model.ast.HttpRequestStepConfig;
 import com.orchestrator.platform.domain.model.ast.TransformStepConfig;
 import com.orchestrator.platform.domain.model.ast.WorkflowAst;
 import com.orchestrator.platform.domain.model.ast.WorkflowStep;
+import com.orchestrator.platform.domain.model.canvas.CanvasEdge;
 import com.orchestrator.platform.domain.model.canvas.CanvasNode;
 import com.orchestrator.platform.domain.model.canvas.CanvasPosition;
 import com.orchestrator.platform.domain.model.canvas.CanvasState;
@@ -270,6 +271,181 @@ public class WorkflowFeaturesAndPortabilityTest {
             assertFalse(results.isFailed(), "Execution failed: " + (results.getErrors() != null ? String.join("\n", results.getErrors()) : ""));
             assertEquals(0, results.getScenarioFailedCount(), "Expected 0 failed scenarios");
             assertTrue(results.getErrors() == null || results.getErrors().isEmpty(), "Expected no errors");
+        } finally {
+            Files.deleteIfExists(tempFeature);
+        }
+    }
+
+    @Test
+    @DisplayName("Verify Downstream variable chaining from DB Poll step into HTTP step (DBEXP-04, D-04, T-01-05)")
+    public void testStandaloneKarateFeatureDbVariableChaining() throws Exception {
+        // 1. Initialize H2 table with test order 601
+        try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:standalone_exec_db;DB_CLOSE_DELAY=-1", "sa", "")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("CREATE TABLE IF NOT EXISTS orders (id INT PRIMARY KEY, status VARCHAR(50), total DECIMAL(10,2))");
+                stmt.execute("DELETE FROM orders WHERE id = 601");
+                stmt.execute("INSERT INTO orders VALUES (601, 'READY', 250.00)");
+            }
+        }
+
+        // 2. Construct 2-step workflow: Step 1 = DB poll (extracts orderId), Step 2 = HTTP GET using ${orderId}
+        WorkflowCreateRequest req = new WorkflowCreateRequest();
+        req.setName("DB Variable Chaining Test");
+
+        CanvasState state = new CanvasState();
+
+        CanvasNode dbNode = new CanvasNode();
+        dbNode.setId("step_db_poll");
+        dbNode.setType("dbPoll");
+        dbNode.setPosition(new CanvasPosition(100, 100));
+        Map<String, Object> dbData = new HashMap<>();
+        dbData.put("name", "Poll Order 601");
+        dbData.put("jdbcUrl", "jdbc:h2:mem:standalone_exec_db;DB_CLOSE_DELAY=-1");
+        dbData.put("username", "sa");
+        dbData.put("password", "");
+        dbData.put("driverClassName", "org.h2.Driver");
+        dbData.put("query", "SELECT id, status, total FROM orders WHERE id = 601");
+        dbData.put("condition", "row.status == 'READY'");
+        dbData.put("maxAttempts", 2);
+        dbData.put("pollIntervalMs", 100L);
+        dbData.put("timeoutMs", 2000L);
+        dbData.put("extractions", List.of(
+                Map.of("variableName", "orderId", "source", "DB_ROW_COLUMN", "jsonPath", "id")
+        ));
+        dbData.put("assertions", List.of(
+                Map.of("field", "status", "operator", "EQUALS", "expectedValue", "READY")
+        ));
+        dbNode.setData(dbData);
+
+        CanvasNode httpNode = new CanvasNode();
+        httpNode.setId("step_http_call");
+        httpNode.setType("httpRequest");
+        httpNode.setPosition(new CanvasPosition(100, 250));
+        Map<String, Object> httpData = new HashMap<>();
+        httpData.put("name", "Fetch Order From Mock API");
+        httpData.put("method", "GET");
+        httpData.put("url", "http://localhost:" + port + "/api/v1/mock/orders/${orderId}");
+        httpData.put("expectedStatus", 200);
+        httpNode.setData(httpData);
+
+        CanvasEdge edge = new CanvasEdge();
+        edge.setId("edge_db_to_http");
+        edge.setSource("step_db_poll");
+        edge.setTarget("step_http_call");
+
+        state.setNodes(List.of(dbNode, httpNode));
+        state.setEdges(List.of(edge));
+        req.setCanvasState(state);
+
+        TestWorkflowEntity wf = workflowService.createWorkflow(req);
+
+        // 3. Export standalone Karate feature text
+        String featureContent = workflowService.generateStandaloneKarateFeature(wf.getId());
+        assertNotNull(featureContent);
+
+        // Verify feature structure contains single scenario and variable chaining expression
+        assertTrue(featureContent.contains("Scenario: Execute Workflow Steps"), "Must emit single scenario for workflow step chaining");
+        assertTrue(featureContent.contains("def orderId = dbResult.rows[0].id"), "Must extract orderId from dbResult");
+        assertTrue(featureContent.contains("Given url 'http://localhost:" + port + "/api/v1/mock/orders/' + orderId"), "Must chain orderId into url expression");
+
+        // 4. Execute via Runner.path against random port mock target server
+        Path tempFeature = Files.createTempFile("standalone-chaining-test-", ".feature");
+        try {
+            Files.writeString(tempFeature, featureContent, StandardCharsets.UTF_8);
+
+            SuiteResult results = Runner.path(tempFeature.toAbsolutePath().toString())
+                    .outputHtmlReport(false)
+                    .parallel(1);
+
+            assertFalse(results.isFailed(), "Chaining execution failed: " + (results.getErrors() != null ? String.join("\n", results.getErrors()) : ""));
+            assertEquals(0, results.getScenarioFailedCount(), "Expected 0 failed scenarios");
+            assertTrue(results.getErrors() == null || results.getErrors().isEmpty(), "Expected no errors");
+        } finally {
+            Files.deleteIfExists(tempFeature);
+        }
+    }
+
+    @Test
+    @DisplayName("Verify Muted DB step export and lean Background without DB steps")
+    public void testStandaloneKarateFeatureMutedDbStep() {
+        WorkflowCreateRequest req = new WorkflowCreateRequest();
+        req.setName("Muted DB Step Flow");
+
+        CanvasState state = new CanvasState();
+        CanvasNode mutedNode = new CanvasNode();
+        mutedNode.setId("step_muted_db");
+        mutedNode.setType("dbPoll");
+        mutedNode.setPosition(new CanvasPosition(100, 100));
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("name", "Disabled Polling Step");
+        data.put("enabled", false);
+        data.put("jdbcUrl", "jdbc:h2:mem:muted_db;DB_CLOSE_DELAY=-1");
+        data.put("query", "SELECT * FROM users");
+        mutedNode.setData(data);
+
+        state.setNodes(List.of(mutedNode));
+        req.setCanvasState(state);
+
+        TestWorkflowEntity wf = workflowService.createWorkflow(req);
+        String feature = workflowService.generateStandaloneKarateFeature(wf.getId());
+        assertNotNull(feature);
+
+        // Must comment out muted step as # [MUTED / DISABLED] Scenario:
+        assertTrue(feature.contains("[MUTED / DISABLED] Scenario: Disabled Polling Step"), "Must comment out disabled step");
+        assertFalse(feature.contains("dbPoll(dbConfig_step_muted_db"), "Must not execute dbPoll for muted step");
+
+        // Since all DB steps in this workflow are disabled, Background must NOT emit JDBC helpers
+        assertFalse(feature.contains("def dbQuery ="), "Workflows with zero active DB steps must not emit dbQuery helper");
+        assertFalse(feature.contains("def dbPoll ="), "Workflows with zero active DB steps must not emit dbPoll helper");
+    }
+
+    @Test
+    @DisplayName("Verify Polling timeout boundaries and maxAttempts exit cleanly without hanging (T-01-06)")
+    public void testStandaloneKarateFeatureTimeoutBoundaries() throws Exception {
+        WorkflowCreateRequest req = new WorkflowCreateRequest();
+        req.setName("Timeout Boundary Flow");
+
+        CanvasState state = new CanvasState();
+        CanvasNode dbNode = new CanvasNode();
+        dbNode.setId("step_db_timeout");
+        dbNode.setType("dbPoll");
+        dbNode.setPosition(new CanvasPosition(100, 100));
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("name", "Poll Non Existent Record");
+        data.put("jdbcUrl", "jdbc:h2:mem:standalone_exec_db;DB_CLOSE_DELAY=-1");
+        data.put("username", "sa");
+        data.put("password", "");
+        data.put("driverClassName", "org.h2.Driver");
+        data.put("query", "SELECT id, status FROM orders WHERE id = 999999");
+        data.put("condition", "row.status == 'COMPLETED'");
+        data.put("maxAttempts", 2);
+        data.put("pollIntervalMs", 50L);
+        data.put("timeoutMs", 300L);
+        dbNode.setData(data);
+
+        state.setNodes(List.of(dbNode));
+        req.setCanvasState(state);
+
+        TestWorkflowEntity wf = workflowService.createWorkflow(req);
+        String feature = workflowService.generateStandaloneKarateFeature(wf.getId());
+        assertNotNull(feature);
+
+        Path tempFeature = Files.createTempFile("standalone-timeout-test-", ".feature");
+        long startTime = System.currentTimeMillis();
+        try {
+            Files.writeString(tempFeature, feature, StandardCharsets.UTF_8);
+
+            SuiteResult results = Runner.path(tempFeature.toAbsolutePath().toString())
+                    .outputHtmlReport(false)
+                    .parallel(1);
+
+            long elapsed = System.currentTimeMillis() - startTime;
+            // The polling loop must exit after maxAttempts=2 (elapsed < 3000ms), failing because record was not matched
+            assertTrue(elapsed < 4000, "Polling loop must terminate within bounded timeout, elapsed: " + elapsed + "ms");
+            assertTrue(results.isFailed(), "Scenario must fail assertion when condition is not met");
+            assertEquals(1, results.getScenarioFailedCount(), "Expected 1 failed scenario");
         } finally {
             Files.deleteIfExists(tempFeature);
         }

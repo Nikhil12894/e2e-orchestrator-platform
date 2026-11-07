@@ -332,13 +332,14 @@ public class TestWorkflowService {
         }
         sb.append("\n");
 
+        sb.append("  Scenario: Execute Workflow Steps\n");
         int stepIdx = 1;
         for (WorkflowStep step : steps) {
             if (!step.isEnabled()) {
-                sb.append("  # [MUTED / DISABLED] Scenario: ").append(step.getName()).append("\n\n");
+                sb.append("    # [MUTED / DISABLED] Scenario: ").append(step.getName()).append("\n\n");
                 continue;
             }
-            sb.append("  Scenario: Step ").append(stepIdx++).append(" - ").append(step.getName()).append("\n");
+            sb.append("    # Step ").append(stepIdx++).append(" - ").append(step.getName()).append("\n");
 
             if (step.getType() == StepType.HTTP_REQUEST && step.getHttpConfig() != null) {
                 HttpRequestStepConfig cfg = step.getHttpConfig();
@@ -348,10 +349,20 @@ public class TestWorkflowService {
                     sb.append("    * retry until responseStatus == ")
                             .append(cfg.getExpectedStatus() != null ? cfg.getExpectedStatus() : 200).append("\n");
                 }
-                sb.append("    Given url '").append(cfg.getUrl() != null ? cfg.getUrl() : "").append("'\n");
+                String rawUrl = cfg.getUrl() != null ? cfg.getUrl() : "";
+                if (rawUrl.contains("${")) {
+                    sb.append("    Given url ").append(formatKarateExpression(rawUrl)).append("\n");
+                } else {
+                    sb.append("    Given url '").append(rawUrl).append("'\n");
+                }
                 if (cfg.getHeaders() != null && !cfg.getHeaders().isEmpty()) {
                     for (Map.Entry<String, String> h : cfg.getHeaders().entrySet()) {
-                        sb.append("    And header ").append(h.getKey()).append(" = '").append(h.getValue()).append("'\n");
+                        String val = h.getValue();
+                        if (val != null && val.contains("${")) {
+                            sb.append("    And header ").append(h.getKey()).append(" = ").append(formatKarateExpression(val)).append("\n");
+                        } else {
+                            sb.append("    And header ").append(h.getKey()).append(" = '").append(val != null ? val : "").append("'\n");
+                        }
                     }
                 }
                 if (cfg.getBody() != null) {
@@ -517,6 +528,38 @@ public class TestWorkflowService {
         return cleanPath;
     }
 
+    private String formatKarateExpression(String str) {
+        if (str == null || !str.contains("${")) {
+            return "'" + (str != null ? str.replace("'", "\\'") : "") + "'";
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\$\\{([^}]+)\\}").matcher(str);
+        StringBuilder out = new StringBuilder();
+        int lastIdx = 0;
+        while (m.find()) {
+            if (m.start() > lastIdx) {
+                if (out.length() > 0) out.append(" + ");
+                out.append("'").append(str.substring(lastIdx, m.start()).replace("'", "\\'")).append("'");
+            }
+            String token = m.group(1).trim();
+            if (out.length() > 0) out.append(" + ");
+            if (token.startsWith("$env:") || token.startsWith("env:")) {
+                String envKey = token.substring(token.indexOf(':') + 1).trim();
+                out.append("(karate.properties['").append(envKey).append("'] || java.lang.System.getenv('").append(envKey).append("'))");
+            } else if (token.startsWith("$secret:") || token.startsWith("secret:")) {
+                String secKey = token.substring(token.indexOf(':') + 1).trim();
+                out.append("(karate.properties['").append(secKey).append("'] || java.lang.System.getenv('").append(secKey).append("'))");
+            } else {
+                out.append(token);
+            }
+            lastIdx = m.end();
+        }
+        if (lastIdx < str.length()) {
+            if (out.length() > 0) out.append(" + ");
+            out.append("'").append(str.substring(lastIdx).replace("'", "\\'")).append("'");
+        }
+        return out.toString();
+    }
+
     @Transactional
     public TestWorkflowEntity importWorkflow(WorkflowCreateRequest request) {
         String originalName = request.getName() != null ? request.getName() : "Imported Workflow";
@@ -538,10 +581,10 @@ public class TestWorkflowService {
         List<CanvasNode> nodes = canvasState.getNodes();
         List<CanvasEdge> edges = canvasState.getEdges() != null ? canvasState.getEdges() : Collections.emptyList();
 
-        // Build adjacency and in-degree maps
-        Map<String, CanvasNode> nodeMap = new HashMap<>();
-        Map<String, List<String>> adj = new HashMap<>();
-        Map<String, Integer> inDegree = new HashMap<>();
+        // Build adjacency and in-degree maps (LinkedHashMap for deterministic ordering)
+        Map<String, CanvasNode> nodeMap = new LinkedHashMap<>();
+        Map<String, List<String>> adj = new LinkedHashMap<>();
+        Map<String, Integer> inDegree = new LinkedHashMap<>();
 
         for (CanvasNode node : nodes) {
             nodeMap.put(node.getId(), node);
