@@ -31,6 +31,7 @@ key-files:
 decisions:
   - "Annotate HttpRequestStepConfig with @JsonIgnoreProperties(ignoreUnknown = true) and @JsonIgnore on isFormEncoded() to avoid persisting pseudo-property to JSONB"
   - "Use Karate native form fields and request keyword semantics in execute-http.feature ensuring formPayload populates MultiPartBuilder without raw JSON body conflict"
+one-liner: "Implemented backend AST model extension (bodyType, formData), dynamic Karate execution with native form fields keyword, mock /api/v1/mock/auth/token endpoint, and standalone Karate .feature export formatting dynamic variable expressions."
 metrics:
   duration: 4 min
   completed: "2026-11-07"

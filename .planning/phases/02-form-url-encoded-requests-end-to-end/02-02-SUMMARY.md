@@ -29,6 +29,7 @@ key-files:
 decisions:
   - "Store form parameters in local component array state formRows to allow duplicate/empty keys during user editing before serializing to formData"
   - "Auto-synchronize Content-Type header when toggling bodyType, reverting to application/json only if it was application/x-www-form-urlencoded"
+one-liner: "Implemented frontend TypeScript data models (bodyType, formData), segmented Request Body Format selector, interactive key-value table editor with ${var} selector insertion, duplicate key inline warnings, and header auto-synchronization in NodeConfigDrawer.tsx."
 metrics:
   duration: 5 min
   completed: "2026-11-07"
