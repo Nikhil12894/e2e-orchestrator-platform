@@ -244,6 +244,9 @@ export interface WorkflowExecution {
   reportPath?: string;
   errorMessage?: string;
   createdAt: string;
+  statusUrl?: string;
+  reportUrl?: string;
+  streamUrl?: string;
 }
 
 export interface ExecutionEventDto {
