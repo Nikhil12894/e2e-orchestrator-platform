@@ -67,6 +67,10 @@ public class WorkflowExecutionController {
             @RequestBody(required = false) WorkflowExecutionRequest request,
             HttpServletRequest httpRequest) {
 
+        if (timeoutStatus != 202 && timeoutStatus != 504) {
+            return ResponseEntity.badRequest().build();
+        }
+
         if (request == null) {
             request = new WorkflowExecutionRequest();
         }
