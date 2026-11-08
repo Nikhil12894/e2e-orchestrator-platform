@@ -98,8 +98,11 @@ public class WorkflowExecutionController {
 
     @PostMapping("/executions/{id}/cancel")
     @Operation(summary = "Cancel execution", description = "Aborts a running virtual thread execution and updates its status to CANCELLED")
-    public ResponseEntity<WorkflowExecutionEntity> cancelExecution(@PathVariable("id") UUID id) {
+    public ResponseEntity<WorkflowExecutionEntity> cancelExecution(
+            @PathVariable("id") UUID id,
+            HttpServletRequest httpRequest) {
         WorkflowExecutionEntity cancelled = executionService.cancelExecution(id);
+        urlBuilder.enrichNavigationUrls(cancelled, httpRequest);
         return ResponseEntity.ok(cancelled);
     }
 
