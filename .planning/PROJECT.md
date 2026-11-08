@@ -33,12 +33,12 @@ Ensure complete functional parity and execution fidelity between visual workflow
 - ✓ **HTTP Form URL-Encoded Configuration Drawer**: Add a Request Body Type toggle (`JSON` vs `x-www-form-urlencoded`) in the visual node drawer when method is `POST`, `PUT`, or `PATCH`, with an interactive key-value table editor, variable injection, and automatic `Content-Type: application/x-www-form-urlencoded` header synchronization — v1.0 Phase 2
 - ✓ **HTTP Form URL-Encoded AST & Execution**: Enhance `HttpRequestStepConfig` with body type support and update `execute-http.feature` to natively invoke Karate's `form fields` keyword instead of `request` when sending form-encoded requests — v1.0 Phase 2
 - ✓ **HTTP Form URL-Encoded Standalone Export**: Update `TestWorkflowService.generateStandaloneKarateFeature()` to emit native Karate `form fields` syntax when exporting form-encoded HTTP steps — v1.0 Phase 2
+- ✓ **Execution Navigation URLs (EXEC-01)**: Execution trigger (`POST /api/v1/workflows/{id}/execute`) and details (`GET /api/v1/executions/{id}`) responses provide absolute `statusUrl`, `reportUrl`, and `streamUrl` navigation URLs resolved against request origin / reverse-proxy headers — Phase 3
+- ✓ **Execution Location Header (EXEC-02)**: Execution trigger endpoint sets standard RFC 7231 `Location` response header matching the absolute `statusUrl` — Phase 3
+- ✓ **Synchronous Wait Execution Mode (EXEC-03)**: Workflow execution trigger endpoint supports `?wait=true` (with defensive `&timeoutSec=N` clamping), blocking on Java 25 Virtual Threads until execution completes and returning HTTP 200 with completed entity, final status, and populated `reportUrl`, or graceful HTTP 504/202 timeout continuation — Phase 4
 
 ### Active
 
-- [ ] **EXEC-01**: Execution trigger and details responses include absolute `statusUrl`, `reportUrl`, and `streamUrl` navigation properties derived from the request origin.
-- [ ] **EXEC-02**: Workflow execution trigger endpoint (`POST /api/v1/workflows/{id}/execute`) sets standard HTTP `Location` header pointing to the status URL.
-- [ ] **EXEC-03**: Workflow execution trigger supports `?wait=true` (with optional `&timeoutSec=N`) to block until execution completes, returning HTTP 200 with final status and report URL.
 - [ ] **EXEC-04**: `CiCdWebhookModal` provides clear cURL commands for async execution with status check, synchronous wait mode, and direct Karate HTML report link template.
 
 ### Out of Scope
@@ -67,6 +67,10 @@ Shipped v1.0 milestone delivering standalone Karate database polling export and 
 | Self-contained inline JDBC helper for exported DB steps | Eliminates custom classpath dependencies so exported `.feature` files run in any standard Karate setup with JDBC driver | ✓ Validated in Phase 1 |
 | Key-value table editor with raw mode in UI drawer | Provides clean developer experience for form parameters while retaining variable insertion capabilities | ✓ Validated in Phase 2 |
 | Native Karate `form fields` keyword in execution & export | Conforms to Karate's built-in URL-encoding behavior and automatic header handling | ✓ Validated in Phase 2 |
+| Dynamic request-origin resolution via `ServletUriComponentsBuilder` | Produces absolute URLs reflecting caller scheme, host, and port without environment-specific hardcoded URLs | ✓ Validated in Phase 3 |
+| Framework-managed proxy strategy `server.forward-headers-strategy: framework` | Standardizes reverse proxy URL adaptation via Spring's `ForwardedHeaderFilter` | ✓ Validated in Phase 3 |
+| Non-blocking Virtual Thread carrier unmounting with `CompletableFuture` | Allows synchronous callers to await completion without holding or pinning OS carrier threads | ✓ Validated in Phase 4 |
+| Defensive parameter clamping (1s-300s) on synchronous wait | Prevents connection starvation attacks while providing reliable timeouts | ✓ Validated in Phase 4 |
 
 ## Evolution
 
@@ -86,4 +90,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-07 after v1.0 milestone*
+*Last updated: 2026-11-08 after Phase 04*
