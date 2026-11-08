@@ -63,7 +63,7 @@ public class WorkflowExecutionController {
             @PathVariable("workflowId") UUID workflowId,
             @RequestParam(value = "wait", required = false, defaultValue = "false") boolean wait,
             @RequestParam(value = "timeoutSec", required = false, defaultValue = "60") int timeoutSec,
-            @RequestParam(value = "timeoutStatus", required = false, defaultValue = "504") int timeoutStatus,
+            @RequestParam(value = "timeoutStatus", required = false, defaultValue = "${orchestrator.execution.default-timeout-status:504}") int timeoutStatus,
             @RequestBody(required = false) WorkflowExecutionRequest request,
             HttpServletRequest httpRequest) {
 
