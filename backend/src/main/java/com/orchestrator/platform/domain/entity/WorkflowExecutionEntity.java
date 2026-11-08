@@ -3,6 +3,7 @@ package com.orchestrator.platform.domain.entity;
 import com.orchestrator.platform.domain.enums.ExecutionStatus;
 import com.orchestrator.platform.domain.enums.TriggerType;
 import com.orchestrator.platform.domain.model.dto.ExecutionStepResult;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -59,6 +60,18 @@ public class WorkflowExecutionEntity implements Serializable {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Transient
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String statusUrl;
+
+    @Transient
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String reportUrl;
+
+    @Transient
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String streamUrl;
+
     @PrePersist
     public void onPrePersist() {
         if (id == null) {
@@ -105,4 +118,13 @@ public class WorkflowExecutionEntity implements Serializable {
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+
+    public String getStatusUrl() { return statusUrl; }
+    public void setStatusUrl(String statusUrl) { this.statusUrl = statusUrl; }
+
+    public String getReportUrl() { return reportUrl; }
+    public void setReportUrl(String reportUrl) { this.reportUrl = reportUrl; }
+
+    public String getStreamUrl() { return streamUrl; }
+    public void setStreamUrl(String streamUrl) { this.streamUrl = streamUrl; }
 }

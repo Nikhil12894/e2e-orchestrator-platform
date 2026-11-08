@@ -5,6 +5,7 @@ import com.orchestrator.platform.domain.model.dto.WorkflowExecutionRequest;
 import com.orchestrator.platform.service.TestWorkflowExecutionService;
 import com.orchestrator.platform.service.execution.DynamicKarateRunner;
 import com.orchestrator.platform.service.execution.ExecutionLogBroadcaster;
+import com.orchestrator.platform.service.execution.ExecutionNavigationUrlBuilder;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,6 +22,7 @@ import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.File;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -37,26 +39,34 @@ public class WorkflowExecutionController {
     private final TestWorkflowExecutionService executionService;
     private final ExecutionLogBroadcaster logBroadcaster;
     private final DynamicKarateRunner karateRunner;
+    private final ExecutionNavigationUrlBuilder urlBuilder;
 
     public WorkflowExecutionController(TestWorkflowExecutionService executionService,
                                        ExecutionLogBroadcaster logBroadcaster,
-                                       DynamicKarateRunner karateRunner) {
+                                       DynamicKarateRunner karateRunner,
+                                       ExecutionNavigationUrlBuilder urlBuilder) {
         this.executionService = executionService;
         this.logBroadcaster = logBroadcaster;
         this.karateRunner = karateRunner;
+        this.urlBuilder = urlBuilder;
     }
 
     @PostMapping("/workflows/{workflowId}/execute")
-    @Operation(summary = "Trigger asynchronous execution", description = "Offloads test execution to Java 21 Virtual Threads and returns HTTP 202 with execution ID")
+    @Operation(summary = "Trigger asynchronous execution", description = "Offloads test execution to Java 21 Virtual Threads and returns HTTP 202 with execution ID and Location header")
     public ResponseEntity<WorkflowExecutionEntity> executeWorkflow(
             @PathVariable("workflowId") UUID workflowId,
-            @RequestBody(required = false) WorkflowExecutionRequest request) {
+            @RequestBody(required = false) WorkflowExecutionRequest request,
+            HttpServletRequest httpRequest) {
 
         if (request == null) {
             request = new WorkflowExecutionRequest();
         }
         WorkflowExecutionEntity execution = executionService.triggerExecution(workflowId, request);
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(execution);
+        urlBuilder.enrichNavigationUrls(execution, httpRequest);
+
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .location(URI.create(execution.getStatusUrl()))
+                .body(execution);
     }
 
     @GetMapping("/executions")
