@@ -113,22 +113,26 @@ public class WorkflowExecutionSyncModeTest {
         }
 
         if (delayWorkflow == null) {
-            TestWorkflowEntity wf = new TestWorkflowEntity();
-            wf.setName("Delay Test Flow");
-            wf.setCanvasState(new CanvasState());
-
-            WorkflowAst ast = new WorkflowAst();
-            WorkflowStep step = new WorkflowStep();
-            step.setId(UUID.randomUUID().toString());
-            step.setName("Delay Step");
-            step.setType(StepType.DELAY);
-            step.setEnabled(true);
-            step.setDelayMs(3000L);
-
-            ast.setSteps(List.of(step));
-            wf.setWorkflowAst(ast);
-            delayWorkflow = workflowRepository.saveAndFlush(wf);
+            delayWorkflow = workflowRepository.saveAndFlush(createDelayWorkflow("Delay Test Flow", 3000L));
         }
+    }
+
+    private TestWorkflowEntity createDelayWorkflow(String name, long delayMs) {
+        TestWorkflowEntity wf = new TestWorkflowEntity();
+        wf.setName(name);
+        wf.setCanvasState(new CanvasState());
+
+        WorkflowAst ast = new WorkflowAst();
+        WorkflowStep step = new WorkflowStep();
+        step.setId(UUID.randomUUID().toString());
+        step.setName("Delay Step");
+        step.setType(StepType.DELAY);
+        step.setEnabled(true);
+        step.setDelayMs(delayMs);
+
+        ast.setSteps(List.of(step));
+        wf.setWorkflowAst(ast);
+        return wf;
     }
 
     @Test
@@ -173,9 +177,12 @@ public class WorkflowExecutionSyncModeTest {
     @Test
     @DisplayName("SYNC-02: Cancelling in-flight execution immediately unblocks synchronous caller with status CANCELLED")
     void testSynchronousExecutionCancellationUnblocksCaller() throws Exception {
+        TestWorkflowEntity cancellationWorkflow = workflowRepository.saveAndFlush(
+                createDelayWorkflow("Cancellation Isolated Flow", 5000L));
+
         CompletableFuture<MvcResult> requestFuture = CompletableFuture.supplyAsync(() -> {
             try {
-                return mockMvc.perform(post("/api/v1/workflows/{id}/execute?wait=true&timeoutSec=10", delayWorkflow.getId())
+                return mockMvc.perform(post("/api/v1/workflows/{id}/execute?wait=true&timeoutSec=10", cancellationWorkflow.getId())
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(new WorkflowExecutionRequest())))
                         .andReturn();
@@ -188,7 +195,7 @@ public class WorkflowExecutionSyncModeTest {
         UUID executionId = null;
         long deadline = System.currentTimeMillis() + 5000;
         while (System.currentTimeMillis() < deadline) {
-            List<WorkflowExecutionEntity> runs = executionRepository.findByWorkflowIdOrderByCreatedAtDesc(delayWorkflow.getId());
+            List<WorkflowExecutionEntity> runs = executionRepository.findByWorkflowIdOrderByCreatedAtDesc(cancellationWorkflow.getId());
             if (!runs.isEmpty() && runs.get(0).getStatus() == ExecutionStatus.RUNNING) {
                 executionId = runs.get(0).getId();
                 break;
@@ -277,5 +284,14 @@ public class WorkflowExecutionSyncModeTest {
                 .andExpect(header().doesNotExist("X-Execution-Timed-Out"))
                 .andExpect(header().exists("Location"))
                 .andExpect(jsonPath("$.statusUrl", notNullValue()));
+    }
+
+    @Test
+    @DisplayName("SYNC-03: Invalid timeoutStatus parameter returns HTTP 400 Bad Request")
+    void testInvalidTimeoutStatusReturns400() throws Exception {
+        mockMvc.perform(post("/api/v1/workflows/{id}/execute?wait=true&timeoutStatus=404", fastWorkflow.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new WorkflowExecutionRequest())))
+                .andExpect(status().isBadRequest());
     }
 }
