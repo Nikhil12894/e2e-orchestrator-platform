@@ -3,6 +3,8 @@ package com.orchestrator.platform.service.execution;
 import com.orchestrator.platform.domain.entity.WorkflowExecutionEntity;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -60,6 +62,9 @@ public class ExecutionNavigationUrlBuilder {
         if (request != null) {
             return ServletUriComponentsBuilder.fromContextPath(request);
         }
-        return ServletUriComponentsBuilder.fromCurrentContextPath();
+        if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes) {
+            return ServletUriComponentsBuilder.fromCurrentContextPath();
+        }
+        return UriComponentsBuilder.newInstance();
     }
 }
