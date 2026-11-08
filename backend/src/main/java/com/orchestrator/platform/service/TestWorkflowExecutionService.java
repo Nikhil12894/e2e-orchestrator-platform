@@ -140,6 +140,9 @@ public class TestWorkflowExecutionService {
             }
         });
         runningTasks.put(executionId, taskFuture);
+        if (taskFuture.isDone()) {
+            runningTasks.remove(executionId);
+        }
 
         return savedExecution;
     }
