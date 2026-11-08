@@ -16,7 +16,7 @@
 </details>
 
 - [x] **Phase 3: Execution Tracking Navigation URLs** - Enrich execution trigger and details responses with absolute navigation URLs (statusUrl, reportUrl, streamUrl) and standard HTTP Location header
-- [ ] **Phase 4: Synchronous Wait Execution Mode** - Support ?wait=true and timeoutSec parameters on execution trigger for blocking execution in CI/CD pipelines
+- [x] **Phase 4: Synchronous Wait Execution Mode** - Support ?wait=true and timeoutSec parameters on execution trigger for blocking execution in CI/CD pipelines (completed 2026-11-08)
 - [ ] **Phase 5: CI/CD Webhook Modal & Pipeline Snippets** - Update visual modal with async/sync mode toggles, status polling cURL snippets, and automated bash script
 
 ## Phase Details
@@ -42,7 +42,7 @@ Plans:
   1. Calling `POST /api/v1/workflows/{id}/execute?wait=true` blocks the HTTP connection on the backend virtual thread until workflow execution finishes
   2. When execution completes within timeout, the API returns HTTP 200 with the completed execution entity, final `ExecutionStatus` (`COMPLETED` or `FAILED`), and generated `reportUrl`
   3. When execution exceeds `timeoutSec` (or the default 60s), the API responds gracefully with HTTP 504 Gateway Timeout or 202 status indicating background continuation without failing the running execution
-**Plans**: 1/1 plans executed
+**Plans**: 1/1 plans complete
 
 Plans:
 - [x] 04-01-PLAN.md — Support ?wait=true and timeoutSec parameters on execution trigger for blocking execution in CI/CD pipelines
@@ -65,5 +65,5 @@ Plans:
 | 1. Database Polling Standalone Karate Export | v1.0 | 2/2 | Complete | 2026-11-07 |
 | 2. Form URL-Encoded Requests End-to-End | v1.0 | 2/2 | Complete | 2026-11-07 |
 | 3. Execution Tracking Navigation URLs | v1.1 | 1/1 | Complete | 2026-11-08 |
-| 4. Synchronous Wait Execution Mode | v1.1 | 1/1 | In Progress | - |
+| 4. Synchronous Wait Execution Mode | v1.1 | 1/1 | Complete    | 2026-11-08 |
 | 5. CI/CD Webhook Modal & Pipeline Snippets | v1.1 | 0/0 | Not started | - |
