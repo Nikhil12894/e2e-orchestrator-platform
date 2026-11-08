@@ -38,10 +38,9 @@ created: "2026-11-08"
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 03-01-01 | 01 | 1 | EXEC-01 | T-03-01 | Host header poison immunity via ForwardedHeaderFilter | integration | `mvn test -Dtest=WorkflowExecutionNavigationUrlTest#testExecutionResponsesContainAbsoluteNavigationUrls -f backend/pom.xml` | ❌ W0 | ⬜ pending |
-| 03-01-02 | 01 | 1 | EXEC-02 | T-03-01 | RFC 7231 Location header matches statusUrl | integration | `mvn test -Dtest=WorkflowExecutionNavigationUrlTest#testTriggerExecutionReturnsLocationHeader -f backend/pom.xml` | ❌ W0 | ⬜ pending |
-| 03-01-03 | 01 | 1 | EXEC-03 | T-03-02 | Path traversal prevented in report URL access | integration | `mvn test -Dtest=WorkflowExecutionNavigationUrlTest#testReportUrlAccessibleOnCompletedRun -f backend/pom.xml` | ❌ W0 | ⬜ pending |
-| 03-01-04 | 01 | 1 | EXEC-01 | — | N/A | static typecheck | `npm --prefix frontend run build` | ✅ Existing | ⬜ pending |
+| 03-01-01 | 01 | 1 | EXEC-01, EXEC-02 | T-03-01 | RFC 7231 Location header matches statusUrl, host header poison immunity | integration | `mvn test -Dtest=WorkflowExecutionNavigationUrlTest#testTriggerExecutionReturnsLocationHeaderAndUrls -f backend/pom.xml` | ❌ W0 | ⬜ pending |
+| 03-01-02 | 01 | 1 | EXEC-01, EXEC-03 | T-03-01, T-03-02 | Details and list endpoints return URLs, completed runs provide direct report link, proxy headers normalized | integration | `mvn test -Dtest=WorkflowExecutionNavigationUrlTest -f backend/pom.xml` | ❌ W0 | ⬜ pending |
+| 03-01-03 | 01 | 1 | EXEC-01 | T-03-SC | Optional frontend TypeScript types compile with zero warnings or breaking changes | static typecheck | `mvn test -f backend/pom.xml && npm --prefix frontend run build` | ✅ Existing | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 

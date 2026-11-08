@@ -29,7 +29,10 @@
   1. Triggering workflow execution via `POST /api/v1/workflows/{id}/execute` returns an HTTP `Location` response header and a response payload containing absolute `statusUrl`, `reportUrl`, and `streamUrl` matching the request scheme and host
   2. Querying workflow execution details via `GET /api/v1/executions/{id}` returns absolute `statusUrl`, `streamUrl`, and `reportUrl` navigation properties
   3. When workflow execution completes or fails, `GET /api/v1/executions/{id}` provides the populated `reportUrl` pointing directly to the generated Karate HTML report endpoint
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 03-01-PLAN.md — Enrich execution trigger and details responses with absolute navigation URLs (statusUrl, reportUrl, streamUrl), HTTP Location header, and reverse proxy support
 
 ### Phase 4: Synchronous Wait Execution Mode
 **Goal**: CI/CD pipelines and automated scripts can trigger workflow execution synchronously via `?wait=true`, blocking until execution completes to obtain final results and report URLs in a single request
@@ -58,6 +61,6 @@
 |-------|-----------|----------------|--------|-----------|
 | 1. Database Polling Standalone Karate Export | v1.0 | 2/2 | Complete | 2026-11-07 |
 | 2. Form URL-Encoded Requests End-to-End | v1.0 | 2/2 | Complete | 2026-11-07 |
-| 3. Execution Tracking Navigation URLs | v1.1 | 0/0 | Not started | - |
+| 3. Execution Tracking Navigation URLs | v1.1 | 0/1 | Ready to execute | - |
 | 4. Synchronous Wait Execution Mode | v1.1 | 0/0 | Not started | - |
 | 5. CI/CD Webhook Modal & Pipeline Snippets | v1.1 | 0/0 | Not started | - |

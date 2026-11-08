@@ -601,12 +601,12 @@ export interface WorkflowExecution {
 |---|-------|---------|---------------|
 | A1 | Defaulting `reportUrl` to `/report/workflow-report.html` during PENDING/RUNNING provides the exact URL that will be populated upon completion. | Phase Requirements (EXEC-03) | Minimal; `serveReportAsset` already defaults `/report/**` and `/report/` requests to `workflow-report.html` (falling back to `karate-summary.html`). Verified in controller lines 133-156. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should `GET /api/v1/executions` (bulk list) also include `statusUrl`, `reportUrl`, and `streamUrl`?**
+1. **Should `GET /api/v1/executions` (bulk list) also include `statusUrl`, `reportUrl`, and `streamUrl`?** — RESOLVED: Yes, enrich the list items as well. The overhead is negligible (pure in-memory string formatting) and improves frontend execution history list capabilities. Implemented in 03-01-PLAN.md Task 2.
    - What we know: EXEC-01 explicitly mandates `POST .../execute` and `GET .../executions/{id}`.
    - What's unclear: Whether bulk queries (`GET /executions?workflowId=...`) need navigation links.
-   - Recommendation: Yes, enrich the list items as well. The overhead is negligible (pure in-memory string formatting) and improves frontend execution history list capabilities.
+   - Resolution: Confirmed and adopted. All execution list items will be enriched with navigation URLs.
 
 ## Environment Availability
 
