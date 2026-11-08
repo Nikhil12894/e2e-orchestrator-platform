@@ -15,9 +15,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Synchronous Execution Mode
 
-- [ ] **SYNC-01**: Execution trigger endpoint supports a `?wait=true` query parameter with configurable `timeoutSec` (default 60s) to block until execution completes on the virtual thread.
-- [ ] **SYNC-02**: When `?wait=true` completes within timeout, the API returns HTTP 200 containing the completed execution entity, final `ExecutionStatus` (`COMPLETED` or `FAILED`), and generated `reportUrl`.
-- [ ] **SYNC-03**: When `?wait=true` exceeds `timeoutSec`, the API responds gracefully with HTTP 504 Gateway Timeout or 202 status indicating background continuation.
+- [x] **SYNC-01**: Execution trigger endpoint supports a `?wait=true` query parameter with configurable `timeoutSec` (default 60s) to block until execution completes on the virtual thread.
+- [x] **SYNC-02**: When `?wait=true` completes within timeout, the API returns HTTP 200 containing the completed execution entity, final `ExecutionStatus` (`COMPLETED` or `FAILED`), and generated `reportUrl`.
+- [x] **SYNC-03**: When `?wait=true` exceeds `timeoutSec`, the API responds gracefully with HTTP 504 Gateway Timeout or 202 status indicating background continuation.
 
 ### CI/CD Webhook & cURL Modal
 
@@ -53,9 +53,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXEC-01 | Phase 3 | Complete |
 | EXEC-02 | Phase 3 | Complete |
 | EXEC-03 | Phase 3 | Complete |
-| SYNC-01 | Phase 4 | Pending |
-| SYNC-02 | Phase 4 | Pending |
-| SYNC-03 | Phase 4 | Pending |
+| SYNC-01 | Phase 4 | Complete |
+| SYNC-02 | Phase 4 | Complete |
+| SYNC-03 | Phase 4 | Complete |
 | CURL-01 | Phase 5 | Pending |
 | CURL-02 | Phase 5 | Pending |
 | CURL-03 | Phase 5 | Pending |

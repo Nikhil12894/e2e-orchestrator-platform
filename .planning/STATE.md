@@ -2,19 +2,19 @@
 gsd_state_version: "1.0"
 milestone: v1.1
 milestone_name: Execution Status & Report URLs for cURL / CI/CD
-current_phase: 4
-current_phase_name: synchronous-wait-execution-mode
-status: executing
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-11-08T01:48:21.831Z"
+current_phase: 04
+current_phase_name: Synchronous Wait Execution Mode
+status: verifying
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-11-08T02:27:58.763Z"
 last_activity: 2026-11-08
-last_activity_desc: Completed 03-01-PLAN.md (Wave 1 Execution Tracking Navigation URLs)
-state_head: 102da020f4b570be311f68fce224bddb2e91c4c4
+last_activity_desc: Phase 04 execution started
+state_head: 07f711480bcd22d26332aabcfa81d9aa13e8339d
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-07)
 
 **Core value:** Ensure complete functional parity and execution fidelity between visual workflows, dynamic in-memory Karate execution, and standalone exported Karate `.feature` files, while providing frictionless execution status tracking and direct HTML report access for automated pipelines and terminal users.
-**Current focus:** Phase 4: Synchronous Wait Execution Mode
+**Current focus:** Phase 04 — Synchronous Wait Execution Mode
 
 ## Current Position
 
-Phase: 4 (synchronous-wait-execution-mode) — READY TO EXECUTE
-Plan: 0 of TBD in current phase
-Status: Ready to execute
-Last activity: 2026-11-08 — Completed 03-01-PLAN.md (Wave 1 Execution Tracking Navigation URLs)
+Phase: 04 (Synchronous Wait Execution Mode) — EXECUTING
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-11-08 — Phase 04 execution started
 
 Progress: [███░░░░░░░] 33%
 
@@ -55,6 +55,11 @@ Progress: [███░░░░░░░] 33%
 - Trend: Stable
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 04 P01 | 13m | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -69,6 +74,10 @@ Recent decisions affecting current work:
 - [Phase 03]: Absolute navigation URLs (statusUrl, reportUrl, streamUrl) to be computed dynamically from request origin/host headers
 - [Phase 03-01]: Used ServletUriComponentsBuilder with @Transient JPA Jackson READ_ONLY transport fields for navigation URLs
 - [Phase 03-01]: Configured server.forward-headers-strategy: framework enabling ForwardedHeaderFilter for reverse proxy origin resolution
+- [Phase 04]: Used CompletableFuture<WorkflowExecutionEntity> for non-blocking carrier thread unmounting on Java 25 Virtual Threads
+- [Phase 04]: Preserved exact asynchronous execution path byte-for-byte when wait=false or omitted (REG-01)
+- [Phase 04]: Defaulted timeout status to HTTP 504 with ?timeoutStatus=202 override, keeping background virtual thread running upon timeout
+- [Phase 04]: Clamped timeoutSec parameter between 1s and orchestrator.execution.max-wait-timeout-sec (300s) to prevent Slowloris attacks
 
 ### Pending Todos
 
@@ -88,8 +97,8 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-11-08
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-11-08T02:27:51.135Z
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

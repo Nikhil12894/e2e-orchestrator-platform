@@ -42,10 +42,10 @@ Plans:
   1. Calling `POST /api/v1/workflows/{id}/execute?wait=true` blocks the HTTP connection on the backend virtual thread until workflow execution finishes
   2. When execution completes within timeout, the API returns HTTP 200 with the completed execution entity, final `ExecutionStatus` (`COMPLETED` or `FAILED`), and generated `reportUrl`
   3. When execution exceeds `timeoutSec` (or the default 60s), the API responds gracefully with HTTP 504 Gateway Timeout or 202 status indicating background continuation without failing the running execution
-**Plans**: 1 plan
+**Plans**: 1/1 plans executed
 
 Plans:
-- [ ] 04-01-PLAN.md — Support ?wait=true and timeoutSec parameters on execution trigger for blocking execution in CI/CD pipelines
+- [x] 04-01-PLAN.md — Support ?wait=true and timeoutSec parameters on execution trigger for blocking execution in CI/CD pipelines
 
 ### Phase 5: CI/CD Webhook Modal & Pipeline Snippets
 **Goal**: Developers authoring automated pipelines can view, configure, and copy ready-to-run cURL commands and CI/CD bash scripts directly from the web UI
@@ -65,5 +65,5 @@ Plans:
 | 1. Database Polling Standalone Karate Export | v1.0 | 2/2 | Complete | 2026-11-07 |
 | 2. Form URL-Encoded Requests End-to-End | v1.0 | 2/2 | Complete | 2026-11-07 |
 | 3. Execution Tracking Navigation URLs | v1.1 | 1/1 | Complete | 2026-11-08 |
-| 4. Synchronous Wait Execution Mode | v1.1 | 0/1 | Not started | - |
+| 4. Synchronous Wait Execution Mode | v1.1 | 1/1 | In Progress | - |
 | 5. CI/CD Webhook Modal & Pipeline Snippets | v1.1 | 0/0 | Not started | - |
