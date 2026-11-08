@@ -429,14 +429,14 @@ exit 1
 | A1 | Developers prefer tabs/segmented toggles over long scrolling pages for switching between cURL and Bash script formats | Architecture Patterns | Low — tabs provide cleaner UX and prevent modal vertical clipping on smaller displays |
 | A2 | POSIX grep/cut parameter extraction is preferable to requiring `jq` in generated bash scripts | Architecture Patterns | Low — POSIX extraction works universally on all runners, including minimal Alpine images |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the modal offer a custom timeout input for synchronous mode?**
    - What we know: Backend supports `?timeoutSec=N` defaulted to 60s, clamped between 1s and 300s (`WorkflowExecutionController.java:90`).
-   - Recommendation: Provide a numeric input with default `60` (min: 1, max: 300) when synchronous mode is toggled, so users can configure expected run durations.
+   - RESOLVED: Provide a numeric input with default `60` (min: 1, max: 300) when synchronous mode is toggled, so users can configure expected run durations. Adopted in `05-01-PLAN.md`.
 2. **Should the bash script support overriding URL and environment via env vars?**
    - What we know: CI/CD systems often inject environment variables like `ORCHESTRATOR_URL` or `TARGET_ENV`.
-   - Recommendation: Use bash default parameter expansion `${ORCHESTRATOR_URL:-http://...}` and `${TARGET_ENV:-default}` with the modal's current values as defaults.
+   - RESOLVED: Use bash default parameter expansion `${ORCHESTRATOR_URL:-http://...}` and `${TARGET_ENV:-default}` with the modal's current values as defaults. Adopted in `05-01-PLAN.md`.
 
 ## Environment Availability
 
