@@ -122,15 +122,16 @@ public class TestWorkflowExecutionService {
                 }
             } catch (Exception e) {
                 log.error("Unhandled error during async virtual thread workflow execution: {}", e.getMessage(), e);
+                boolean wasCancelled = DynamicKarateBridge.isExecutionCancelled(executionId.toString());
                 WorkflowExecutionEntity failed = executionRepository.findById(executionId).map(ex -> {
-                    if (ex.getStatus() != ExecutionStatus.CANCELLED) {
+                    if (!wasCancelled && ex.getStatus() != ExecutionStatus.CANCELLED) {
                         ex.setStatus(ExecutionStatus.FAILED);
                         ex.setErrorMessage(e.getMessage());
                         return executionRepository.saveAndFlush(ex);
                     }
                     return ex;
                 }).orElse(savedExecution);
-                if (future != null) {
+                if (future != null && !wasCancelled) {
                     future.complete(failed);
                 }
             } finally {
