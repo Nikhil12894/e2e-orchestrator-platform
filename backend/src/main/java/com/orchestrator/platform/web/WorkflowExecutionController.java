@@ -1,6 +1,7 @@
 package com.orchestrator.platform.web;
 
 import com.orchestrator.platform.domain.entity.WorkflowExecutionEntity;
+import com.orchestrator.platform.domain.model.dto.ExecutionSyncResult;
 import com.orchestrator.platform.domain.model.dto.WorkflowExecutionRequest;
 import com.orchestrator.platform.service.TestWorkflowExecutionService;
 import com.orchestrator.platform.service.execution.DynamicKarateRunner;
@@ -52,19 +53,44 @@ public class WorkflowExecutionController {
     }
 
     @PostMapping("/workflows/{workflowId}/execute")
-    @Operation(summary = "Trigger asynchronous execution", description = "Offloads test execution to Java 21 Virtual Threads and returns HTTP 202 with execution ID and Location header")
+    @Operation(summary = "Trigger workflow execution",
+            description = "Triggers workflow test execution. With ?wait=true, blocks up to timeoutSec returning HTTP 200 upon completion or HTTP 504 on timeout. Without ?wait=true, returns HTTP 202 immediately.")
     public ResponseEntity<WorkflowExecutionEntity> executeWorkflow(
             @PathVariable("workflowId") UUID workflowId,
+            @RequestParam(value = "wait", required = false, defaultValue = "false") boolean wait,
+            @RequestParam(value = "timeoutSec", required = false, defaultValue = "60") int timeoutSec,
             @RequestBody(required = false) WorkflowExecutionRequest request,
             HttpServletRequest httpRequest) {
 
         if (request == null) {
             request = new WorkflowExecutionRequest();
         }
-        WorkflowExecutionEntity execution = executionService.triggerExecution(workflowId, request);
+
+        if (!wait) {
+            WorkflowExecutionEntity execution = executionService.triggerExecution(workflowId, request);
+            urlBuilder.enrichNavigationUrls(execution, httpRequest);
+
+            ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.status(HttpStatus.ACCEPTED);
+            if (execution != null && execution.getStatusUrl() != null) {
+                responseBuilder.location(URI.create(execution.getStatusUrl()));
+            }
+            return responseBuilder.body(execution);
+        }
+
+        ExecutionSyncResult syncResult = executionService.triggerExecutionSync(workflowId, request, timeoutSec);
+        WorkflowExecutionEntity execution = syncResult.execution();
         urlBuilder.enrichNavigationUrls(execution, httpRequest);
 
-        ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.status(HttpStatus.ACCEPTED);
+        if (syncResult.timedOut()) {
+            ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
+                    .header("X-Execution-Timed-Out", "true");
+            if (execution != null && execution.getStatusUrl() != null) {
+                responseBuilder.location(URI.create(execution.getStatusUrl()));
+            }
+            return responseBuilder.body(execution);
+        }
+
+        ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.ok();
         if (execution != null && execution.getStatusUrl() != null) {
             responseBuilder.location(URI.create(execution.getStatusUrl()));
         }

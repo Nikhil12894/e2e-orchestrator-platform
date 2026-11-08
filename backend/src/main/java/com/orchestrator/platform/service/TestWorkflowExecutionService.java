@@ -15,14 +15,19 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import com.orchestrator.platform.domain.model.dto.ExecutionSyncResult;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Service
 public class TestWorkflowExecutionService {
@@ -35,6 +40,7 @@ public class TestWorkflowExecutionService {
     private final ExecutionLogBroadcaster logBroadcaster;
     private final ExecutorService virtualThreadExecutor;
     private final Map<UUID, Future<?>> runningTasks = new ConcurrentHashMap<>();
+    private final Map<UUID, CompletableFuture<WorkflowExecutionEntity>> executionFutures = new ConcurrentHashMap<>();
 
     @Value("${orchestrator.retention.auto-prune-enabled:true}")
     private boolean autoPruneEnabled;
@@ -55,6 +61,37 @@ public class TestWorkflowExecutionService {
     }
 
     public WorkflowExecutionEntity triggerExecution(UUID workflowId, WorkflowExecutionRequest request) {
+        return triggerExecutionInternal(workflowId, request, null);
+    }
+
+    public ExecutionSyncResult triggerExecutionSync(UUID workflowId, WorkflowExecutionRequest request, int timeoutSec) {
+        CompletableFuture<WorkflowExecutionEntity> completionFuture = new CompletableFuture<>();
+        WorkflowExecutionEntity pending = triggerExecutionInternal(workflowId, request, completionFuture);
+        UUID executionId = pending.getId();
+
+        try {
+            WorkflowExecutionEntity completed = completionFuture.get(timeoutSec, TimeUnit.SECONDS);
+            return new ExecutionSyncResult(completed, false);
+        } catch (TimeoutException e) {
+            log.warn("Synchronous wait timed out after {}s for execution [id={}] (continuing in background)",
+                    timeoutSec, executionId);
+            WorkflowExecutionEntity inFlight = executionRepository.findById(executionId).orElse(pending);
+            return new ExecutionSyncResult(inFlight, true);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Synchronous wait interrupted for execution [id={}]", executionId);
+            WorkflowExecutionEntity inFlight = executionRepository.findById(executionId).orElse(pending);
+            return new ExecutionSyncResult(inFlight, true);
+        } catch (ExecutionException e) {
+            log.error("Execution failed with exception: {}", e.getMessage(), e);
+            WorkflowExecutionEntity inFlight = executionRepository.findById(executionId).orElse(pending);
+            return new ExecutionSyncResult(inFlight, false);
+        }
+    }
+
+    private WorkflowExecutionEntity triggerExecutionInternal(UUID workflowId,
+                                                              WorkflowExecutionRequest request,
+                                                              CompletableFuture<WorkflowExecutionEntity> future) {
         TestWorkflowEntity workflow = workflowRepository.findById(workflowId)
                 .orElseThrow(() -> new IllegalArgumentException("Workflow not found with ID: " + workflowId));
 
@@ -67,26 +104,38 @@ public class TestWorkflowExecutionService {
         WorkflowExecutionEntity savedExecution = executionRepository.saveAndFlush(execution);
         UUID executionId = savedExecution.getId();
 
-        // Offload execution to Java 21 Virtual Threads
+        if (future != null) {
+            executionFutures.put(executionId, future);
+        }
+
+        // Offload execution to Java 25 Virtual Threads
         Future<?> taskFuture = virtualThreadExecutor.submit(() -> {
             try {
-                karateRunner.executeWorkflow(
+                WorkflowExecutionEntity finished = karateRunner.executeWorkflow(
                         savedExecution,
                         workflow,
                         request.getInitialVariables(),
                         request.getEnvironment()
                 );
+                if (future != null) {
+                    future.complete(finished);
+                }
             } catch (Exception e) {
                 log.error("Unhandled error during async virtual thread workflow execution: {}", e.getMessage(), e);
-                executionRepository.findById(executionId).ifPresent(ex -> {
+                WorkflowExecutionEntity failed = executionRepository.findById(executionId).map(ex -> {
                     if (ex.getStatus() != ExecutionStatus.CANCELLED) {
                         ex.setStatus(ExecutionStatus.FAILED);
                         ex.setErrorMessage(e.getMessage());
-                        executionRepository.saveAndFlush(ex);
+                        return executionRepository.saveAndFlush(ex);
                     }
-                });
+                    return ex;
+                }).orElse(savedExecution);
+                if (future != null) {
+                    future.complete(failed);
+                }
             } finally {
                 runningTasks.remove(executionId);
+                executionFutures.remove(executionId);
                 pruneWorkflowExecutionsIfExceeded(workflowId);
             }
         });
