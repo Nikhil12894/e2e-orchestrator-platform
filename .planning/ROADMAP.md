@@ -55,8 +55,11 @@ Plans:
   1. User can open `CiCdWebhookModal` and toggle between "Asynchronous Trigger (HTTP 202)" and "Synchronous CI/CD Pipeline (HTTP 200 with report link)" execution modes
   2. User can view and copy updated cURL commands showing status polling and direct Karate HTML report URL formats alongside the trigger command
   3. User can copy an end-to-end CI/CD bash script that triggers execution, verifies exit status, and outputs the direct HTML report URL
-**Plans**: TBD
+**Plans**: 1 plan
 **UI hint**: yes
+
+Plans:
+- [ ] 05-01-PLAN.md — Update visual modal with async/sync mode toggles, status polling cURL snippets, and automated bash script
 
 ## Progress
 
@@ -66,4 +69,4 @@ Plans:
 | 2. Form URL-Encoded Requests End-to-End | v1.0 | 2/2 | Complete | 2026-11-07 |
 | 3. Execution Tracking Navigation URLs | v1.1 | 1/1 | Complete | 2026-11-08 |
 | 4. Synchronous Wait Execution Mode | v1.1 | 1/1 | Complete    | 2026-11-08 |
-| 5. CI/CD Webhook Modal & Pipeline Snippets | v1.1 | 0/0 | Not started | - |
+| 5. CI/CD Webhook Modal & Pipeline Snippets | v1.1 | 0/1 | Not started | - |
