@@ -37,15 +37,17 @@ public class ExecutionNavigationUrlBuilder {
 
     public String buildReportUrl(UUID executionId, String reportPath, HttpServletRequest request) {
         if (reportPath != null && !reportPath.isBlank()) {
-            if (reportPath.startsWith("/")) {
+            if (reportPath.startsWith("/") && !reportPath.startsWith("//")) {
                 return getBaseBuilder(request)
                         .path(reportPath)
                         .toUriString();
             } else {
-                return getBaseBuilder(request)
-                        .path("/api/v1/executions/{id}/report/" + reportPath)
+                String baseReportUrl = getBaseBuilder(request)
+                        .path("/api/v1/executions/{id}/report/")
                         .buildAndExpand(executionId)
                         .toUriString();
+                String cleanReportPath = reportPath.startsWith("/") ? reportPath.substring(1) : reportPath;
+                return baseReportUrl + cleanReportPath;
             }
         }
         return getBaseBuilder(request)
