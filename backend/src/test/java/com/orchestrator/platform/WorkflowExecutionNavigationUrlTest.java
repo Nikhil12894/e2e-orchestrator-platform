@@ -83,7 +83,9 @@ public class WorkflowExecutionNavigationUrlTest {
         entity.setWorkflowId(testWorkflow.getId());
         entity.setWorkflowName(testWorkflow.getName());
         entity.setStatus(ExecutionStatus.COMPLETED);
-        String reportPath = "/api/v1/executions/" + UUID.randomUUID() + "/report/workflow-report.html";
+        entity = executionRepository.save(entity);
+
+        String reportPath = "/api/v1/executions/" + entity.getId() + "/report/workflow-report.html";
         entity.setReportPath(reportPath);
         entity = executionRepository.save(entity);
 
