@@ -29,7 +29,7 @@
   1. Triggering workflow execution via `POST /api/v1/workflows/{id}/execute` returns an HTTP `Location` response header and a response payload containing absolute `statusUrl`, `reportUrl`, and `streamUrl` matching the request scheme and host
   2. Querying workflow execution details via `GET /api/v1/executions/{id}` returns absolute `statusUrl`, `streamUrl`, and `reportUrl` navigation properties
   3. When workflow execution completes or fails, `GET /api/v1/executions/{id}` provides the populated `reportUrl` pointing directly to the generated Karate HTML report endpoint
-**Plans**: 1 plan
+**Plans**: 1/1 plans complete
 
 Plans:
 - [x] 03-01-PLAN.md — Enrich execution trigger and details responses with absolute navigation URLs (statusUrl, reportUrl, streamUrl), HTTP Location header, and reverse proxy support
