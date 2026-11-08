@@ -174,6 +174,11 @@ public class TestWorkflowExecutionService {
             ));
         }
 
+        CompletableFuture<WorkflowExecutionEntity> future = executionFutures.remove(executionId);
+        if (future != null) {
+            future.complete(execution);
+        }
+
         return execution;
     }
 
