@@ -64,9 +64,11 @@ public class WorkflowExecutionController {
         WorkflowExecutionEntity execution = executionService.triggerExecution(workflowId, request);
         urlBuilder.enrichNavigationUrls(execution, httpRequest);
 
-        return ResponseEntity.status(HttpStatus.ACCEPTED)
-                .location(URI.create(execution.getStatusUrl()))
-                .body(execution);
+        ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.status(HttpStatus.ACCEPTED);
+        if (execution != null && execution.getStatusUrl() != null) {
+            responseBuilder.location(URI.create(execution.getStatusUrl()));
+        }
+        return responseBuilder.body(execution);
     }
 
     @GetMapping("/executions")
