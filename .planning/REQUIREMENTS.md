@@ -9,9 +9,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### API Execution Tracking & URL Navigation
 
-- [ ] **EXEC-01**: Execution trigger response (`POST /api/v1/workflows/{id}/execute`) and details response (`GET /api/v1/executions/{id}`) include absolute navigation URLs: `statusUrl`, `reportUrl`, and `streamUrl` computed from request host/origin.
-- [ ] **EXEC-02**: Workflow execution trigger (`POST /api/v1/workflows/{id}/execute`) sets standard HTTP `Location` response header pointing to the absolute `statusUrl`.
-- [ ] **EXEC-03**: Workflow execution details endpoint (`GET /api/v1/executions/{id}`) provides the generated `reportUrl` immediately upon completion or failure.
+- [x] **EXEC-01**: Execution trigger response (`POST /api/v1/workflows/{id}/execute`) and details response (`GET /api/v1/executions/{id}`) include absolute navigation URLs: `statusUrl`, `reportUrl`, and `streamUrl` computed from request host/origin.
+- [x] **EXEC-02**: Workflow execution trigger (`POST /api/v1/workflows/{id}/execute`) sets standard HTTP `Location` response header pointing to the absolute `statusUrl`.
+- [x] **EXEC-03**: Workflow execution details endpoint (`GET /api/v1/executions/{id}`) provides the generated `reportUrl` immediately upon completion or failure.
 
 ### Synchronous Execution Mode
 
@@ -50,9 +50,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EXEC-01 | Phase 3 | Pending |
-| EXEC-02 | Phase 3 | Pending |
-| EXEC-03 | Phase 3 | Pending |
+| EXEC-01 | Phase 3 | Complete |
+| EXEC-02 | Phase 3 | Complete |
+| EXEC-03 | Phase 3 | Complete |
 | SYNC-01 | Phase 4 | Pending |
 | SYNC-02 | Phase 4 | Pending |
 | SYNC-03 | Phase 4 | Pending |

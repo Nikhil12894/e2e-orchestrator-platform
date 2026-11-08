@@ -1,9 +1,9 @@
 ---
 phase: "03"
 slug: "execution-tracking-navigation-urls"
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: "2026-11-08"
 ---
 
@@ -38,9 +38,9 @@ created: "2026-11-08"
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 03-01-01 | 01 | 1 | EXEC-01, EXEC-02 | T-03-01 | RFC 7231 Location header matches statusUrl, host header poison immunity | integration | `mvn test -Dtest=WorkflowExecutionNavigationUrlTest#testTriggerExecutionReturnsLocationHeaderAndUrls -f backend/pom.xml` | ❌ W0 | ⬜ pending |
-| 03-01-02 | 01 | 1 | EXEC-01, EXEC-03 | T-03-01, T-03-02 | Details and list endpoints return URLs, completed runs provide direct report link, proxy headers normalized | integration | `mvn test -Dtest=WorkflowExecutionNavigationUrlTest -f backend/pom.xml` | ❌ W0 | ⬜ pending |
-| 03-01-03 | 01 | 1 | EXEC-01 | T-03-SC | Optional frontend TypeScript types compile with zero warnings or breaking changes | static typecheck | `mvn test -f backend/pom.xml && npm --prefix frontend run build` | ✅ Existing | ⬜ pending |
+| 03-01-01 | 01 | 1 | EXEC-01, EXEC-02 | T-03-01 | RFC 7231 Location header matches statusUrl, host header poison immunity | integration | `mvn test -Dtest=WorkflowExecutionNavigationUrlTest#testTriggerExecutionReturnsLocationHeaderAndUrls -f backend/pom.xml` | ✅ W0 | ✅ green |
+| 03-01-02 | 01 | 1 | EXEC-01, EXEC-03 | T-03-01, T-03-02 | Details and list endpoints return URLs, completed runs provide direct report link, proxy headers normalized | integration | `mvn test -Dtest=WorkflowExecutionNavigationUrlTest -f backend/pom.xml` | ✅ W0 | ✅ green |
+| 03-01-03 | 01 | 1 | EXEC-01 | T-03-SC | Optional frontend TypeScript types compile with zero warnings or breaking changes | static typecheck | `mvn test -f backend/pom.xml && npm --prefix frontend run build` | ✅ Existing | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -48,7 +48,7 @@ created: "2026-11-08"
 
 ## Wave 0 Requirements
 
-- [ ] `backend/src/test/java/com/orchestrator/platform/WorkflowExecutionNavigationUrlTest.java` — MockMvc test covering EXEC-01, EXEC-02, EXEC-03, Location header, and ForwardedHeaderFilter.
+- [x] `backend/src/test/java/com/orchestrator/platform/WorkflowExecutionNavigationUrlTest.java` — MockMvc test covering EXEC-01, EXEC-02, EXEC-03, Location header, and ForwardedHeaderFilter.
 
 ---
 
@@ -62,11 +62,12 @@ created: "2026-11-08"
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 5s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 5s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** complete
+

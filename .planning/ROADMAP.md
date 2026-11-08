@@ -15,7 +15,7 @@
 
 </details>
 
-- [ ] **Phase 3: Execution Tracking Navigation URLs** - Enrich execution trigger and details responses with absolute navigation URLs (statusUrl, reportUrl, streamUrl) and standard HTTP Location header
+- [x] **Phase 3: Execution Tracking Navigation URLs** - Enrich execution trigger and details responses with absolute navigation URLs (statusUrl, reportUrl, streamUrl) and standard HTTP Location header
 - [ ] **Phase 4: Synchronous Wait Execution Mode** - Support ?wait=true and timeoutSec parameters on execution trigger for blocking execution in CI/CD pipelines
 - [ ] **Phase 5: CI/CD Webhook Modal & Pipeline Snippets** - Update visual modal with async/sync mode toggles, status polling cURL snippets, and automated bash script
 
@@ -32,7 +32,7 @@
 **Plans**: 1 plan
 
 Plans:
-- [ ] 03-01-PLAN.md — Enrich execution trigger and details responses with absolute navigation URLs (statusUrl, reportUrl, streamUrl), HTTP Location header, and reverse proxy support
+- [x] 03-01-PLAN.md — Enrich execution trigger and details responses with absolute navigation URLs (statusUrl, reportUrl, streamUrl), HTTP Location header, and reverse proxy support
 
 ### Phase 4: Synchronous Wait Execution Mode
 **Goal**: CI/CD pipelines and automated scripts can trigger workflow execution synchronously via `?wait=true`, blocking until execution completes to obtain final results and report URLs in a single request
@@ -61,6 +61,6 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1. Database Polling Standalone Karate Export | v1.0 | 2/2 | Complete | 2026-11-07 |
 | 2. Form URL-Encoded Requests End-to-End | v1.0 | 2/2 | Complete | 2026-11-07 |
-| 3. Execution Tracking Navigation URLs | v1.1 | 0/1 | Ready to execute | - |
+| 3. Execution Tracking Navigation URLs | v1.1 | 1/1 | Complete | 2026-11-08 |
 | 4. Synchronous Wait Execution Mode | v1.1 | 0/0 | Not started | - |
 | 5. CI/CD Webhook Modal & Pipeline Snippets | v1.1 | 0/0 | Not started | - |
