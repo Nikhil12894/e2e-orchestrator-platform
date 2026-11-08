@@ -72,18 +72,25 @@ public class WorkflowExecutionController {
     @GetMapping("/executions")
     @Operation(summary = "List all executions", description = "Returns execution history across all workflows")
     public ResponseEntity<List<WorkflowExecutionEntity>> getAllExecutions(
-            @RequestParam(value = "workflowId", required = false) UUID workflowId) {
-        if (workflowId != null) {
-            return ResponseEntity.ok(executionService.getExecutionsForWorkflow(workflowId));
-        }
-        return ResponseEntity.ok(executionService.getAllExecutions());
+            @RequestParam(value = "workflowId", required = false) UUID workflowId,
+            HttpServletRequest httpRequest) {
+        List<WorkflowExecutionEntity> executions = (workflowId != null)
+                ? executionService.getExecutionsForWorkflow(workflowId)
+                : executionService.getAllExecutions();
+        executions.forEach(e -> urlBuilder.enrichNavigationUrls(e, httpRequest));
+        return ResponseEntity.ok(executions);
     }
 
     @GetMapping("/executions/{id}")
     @Operation(summary = "Get execution details", description = "Fetches status, context snapshot, step evaluations, and report links")
-    public ResponseEntity<WorkflowExecutionEntity> getExecutionById(@PathVariable("id") UUID id) {
+    public ResponseEntity<WorkflowExecutionEntity> getExecutionById(
+            @PathVariable("id") UUID id,
+            HttpServletRequest httpRequest) {
         return executionService.getExecutionById(id)
-                .map(ResponseEntity::ok)
+                .map(execution -> {
+                    urlBuilder.enrichNavigationUrls(execution, httpRequest);
+                    return ResponseEntity.ok(execution);
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
