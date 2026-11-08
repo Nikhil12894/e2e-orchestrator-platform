@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -42,6 +43,9 @@ public class WorkflowExecutionController {
     private final DynamicKarateRunner karateRunner;
     private final ExecutionNavigationUrlBuilder urlBuilder;
 
+    @Value("${orchestrator.execution.max-wait-timeout-sec:300}")
+    private int maxWaitTimeoutSec = 300;
+
     public WorkflowExecutionController(TestWorkflowExecutionService executionService,
                                        ExecutionLogBroadcaster logBroadcaster,
                                        DynamicKarateRunner karateRunner,
@@ -54,11 +58,12 @@ public class WorkflowExecutionController {
 
     @PostMapping("/workflows/{workflowId}/execute")
     @Operation(summary = "Trigger workflow execution",
-            description = "Triggers workflow test execution. With ?wait=true, blocks up to timeoutSec returning HTTP 200 upon completion or HTTP 504 on timeout. Without ?wait=true, returns HTTP 202 immediately.")
+            description = "Triggers workflow test execution. With ?wait=true, blocks up to timeoutSec returning HTTP 200 upon completion, or HTTP 504 (or 202 if timeoutStatus=202) on timeout. Without ?wait=true, returns HTTP 202 immediately.")
     public ResponseEntity<WorkflowExecutionEntity> executeWorkflow(
             @PathVariable("workflowId") UUID workflowId,
             @RequestParam(value = "wait", required = false, defaultValue = "false") boolean wait,
             @RequestParam(value = "timeoutSec", required = false, defaultValue = "60") int timeoutSec,
+            @RequestParam(value = "timeoutStatus", required = false, defaultValue = "504") int timeoutStatus,
             @RequestBody(required = false) WorkflowExecutionRequest request,
             HttpServletRequest httpRequest) {
 
@@ -77,12 +82,16 @@ public class WorkflowExecutionController {
             return responseBuilder.body(execution);
         }
 
-        ExecutionSyncResult syncResult = executionService.triggerExecutionSync(workflowId, request, timeoutSec);
+        // Defensive parameter clamping against connection starvation / Slowloris (T-04-01)
+        int clampedTimeout = Math.max(1, Math.min(timeoutSec, maxWaitTimeoutSec));
+
+        ExecutionSyncResult syncResult = executionService.triggerExecutionSync(workflowId, request, clampedTimeout);
         WorkflowExecutionEntity execution = syncResult.execution();
         urlBuilder.enrichNavigationUrls(execution, httpRequest);
 
         if (syncResult.timedOut()) {
-            ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
+            HttpStatus status = (timeoutStatus == 202) ? HttpStatus.ACCEPTED : HttpStatus.GATEWAY_TIMEOUT;
+            ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.status(status)
                     .header("X-Execution-Timed-Out", "true");
             if (execution != null && execution.getStatusUrl() != null) {
                 responseBuilder.location(URI.create(execution.getStatusUrl()));

@@ -41,6 +41,9 @@ spring:
     placeholder-replacement: ${SPRING_FLYWAY_PLACEHOLDER_REPLACEMENT:false}
 
 orchestrator:
+  execution:
+    max-wait-timeout-sec: ${ORCHESTRATOR_EXECUTION_MAX_WAIT_TIMEOUT_SEC:300}
+    default-timeout-status: ${ORCHESTRATOR_EXECUTION_DEFAULT_TIMEOUT_STATUS:504}
   reports:
     base-path: ${ORCHESTRATOR_REPORTS_PATH:./target/karate-reports}
   retention:

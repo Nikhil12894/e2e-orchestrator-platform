@@ -210,4 +210,72 @@ public class WorkflowExecutionSyncModeTest {
         String responseJson = result.getResponse().getContentAsString();
         assertTrue(responseJson.contains("\"status\":\"CANCELLED\""), "Response should reflect CANCELLED status: " + responseJson);
     }
+
+    @Test
+    @DisplayName("SYNC-03: Exceeding timeoutSec returns HTTP 504 Gateway Timeout with X-Execution-Timed-Out header")
+    void testSynchronousExecutionTimeoutReturns504() throws Exception {
+        mockMvc.perform(post("/api/v1/workflows/{id}/execute?wait=true&timeoutSec=1", delayWorkflow.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new WorkflowExecutionRequest())))
+                .andExpect(status().isGatewayTimeout())
+                .andExpect(header().string("X-Execution-Timed-Out", "true"))
+                .andExpect(header().exists("Location"))
+                .andExpect(header().string("Location", matchesPattern("http://localhost/api/v1/executions/[0-9a-fA-F-]+")))
+                .andExpect(jsonPath("$.status", isOneOf("RUNNING", "PENDING")));
+    }
+
+    @Test
+    @DisplayName("SYNC-03: Exceeding timeout leaves background execution running until final completion")
+    void testTimeoutLeavesBackgroundExecutionRunning() throws Exception {
+        MvcResult timeoutResult = mockMvc.perform(post("/api/v1/workflows/{id}/execute?wait=true&timeoutSec=1", delayWorkflow.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new WorkflowExecutionRequest())))
+                .andExpect(status().isGatewayTimeout())
+                .andExpect(header().string("X-Execution-Timed-Out", "true"))
+                .andReturn();
+
+        String responseJson = timeoutResult.getResponse().getContentAsString();
+        WorkflowExecutionEntity entity = objectMapper.readValue(responseJson, WorkflowExecutionEntity.class);
+        UUID executionId = entity.getId();
+
+        // Background execution continues running without being cancelled (mitigating T-04-02)
+        long deadline = System.currentTimeMillis() + 10000;
+        WorkflowExecutionEntity finalEntity = null;
+        while (System.currentTimeMillis() < deadline) {
+            WorkflowExecutionEntity current = executionRepository.findById(executionId).orElse(null);
+            if (current != null && (current.getStatus() == ExecutionStatus.COMPLETED || current.getStatus() == ExecutionStatus.FAILED)) {
+                finalEntity = current;
+                break;
+            }
+            Thread.sleep(100);
+        }
+
+        assertNotNull(finalEntity, "Background execution should finish within 10s without cancellation");
+        assertEquals(ExecutionStatus.COMPLETED, finalEntity.getStatus());
+        assertNotNull(finalEntity.getReportPath());
+    }
+
+    @Test
+    @DisplayName("SYNC-03: timeoutStatus=202 query parameter overrides default 504 response code")
+    void testTimeoutStatus202Override() throws Exception {
+        mockMvc.perform(post("/api/v1/workflows/{id}/execute?wait=true&timeoutSec=1&timeoutStatus=202", delayWorkflow.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new WorkflowExecutionRequest())))
+                .andExpect(status().isAccepted())
+                .andExpect(header().string("X-Execution-Timed-Out", "true"))
+                .andExpect(header().exists("Location"))
+                .andExpect(jsonPath("$.status", isOneOf("RUNNING", "PENDING")));
+    }
+
+    @Test
+    @DisplayName("REG-01: Asynchronous execution without ?wait=true returns HTTP 202 without timeout header")
+    void testAsynchronousExecutionRegressionReturns202() throws Exception {
+        mockMvc.perform(post("/api/v1/workflows/{id}/execute", fastWorkflow.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new WorkflowExecutionRequest())))
+                .andExpect(status().isAccepted())
+                .andExpect(header().doesNotExist("X-Execution-Timed-Out"))
+                .andExpect(header().exists("Location"))
+                .andExpect(jsonPath("$.statusUrl", notNullValue()));
+    }
 }
