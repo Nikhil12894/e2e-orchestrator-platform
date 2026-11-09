@@ -12,7 +12,7 @@ Feature: Dynamic Step Executor
     * def stepRes = null
 
     # Branch 1: HTTP API Request
-    * if (stepType == 'HTTP_REQUEST') karate.set('stepRes', karate.call('classpath:karate/execute-http.feature', { resolvedStep: resolvedStep, executionId: executionId, flowHeaders: flowHeaders }))
+    * if (stepType == 'HTTP_REQUEST') karate.set('stepRes', karate.call('classpath:karate/execute-http.feature', { resolvedStep: resolvedStep, executionId: executionId, flowHeaders: flowHeaders, globalContext: globalContext }))
 
     # Branch 2: Database Polling via HikariCP
     * if (stepType == 'DB_POLL') karate.set('stepRes', karate.call('classpath:karate/execute-db.feature', { resolvedStep: resolvedStep, executionId: executionId }))

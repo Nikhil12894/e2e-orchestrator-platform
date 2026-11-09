@@ -6,7 +6,11 @@ import io.karatelabs.core.SuiteResult;
 import com.orchestrator.platform.domain.entity.TestWorkflowEntity;
 import com.orchestrator.platform.domain.entity.WorkflowExecutionEntity;
 import com.orchestrator.platform.domain.enums.ExecutionStatus;
+import com.orchestrator.platform.domain.enums.StepType;
+import com.orchestrator.platform.domain.model.ast.SetupWorkflowConfig;
+import com.orchestrator.platform.domain.model.ast.SubWorkflowStepConfig;
 import com.orchestrator.platform.domain.model.ast.WorkflowAst;
+import com.orchestrator.platform.domain.model.ast.WorkflowStep;
 import com.orchestrator.platform.domain.model.dto.ExecutionEventDto;
 import com.orchestrator.platform.domain.model.dto.ExecutionStepResult;
 import com.orchestrator.platform.repository.WorkflowExecutionRepository;
@@ -138,10 +142,36 @@ public class DynamicKarateRunner {
         workflowPayload.put("workflowName", workflow.getName());
         workflowPayload.put("flowHeaders", resolvedFlowHeaders);
 
-        List<?> stepList = Collections.emptyList();
-        if (ast != null && ast.getSteps() != null) {
-            stepList = objectMapper.convertValue(ast.getSteps(), List.class);
+        List<WorkflowStep> executableSteps = new ArrayList<>();
+        if (ast != null && ast.getSetupWorkflow() != null && ast.getSetupWorkflow().isEnabled()
+                && ast.getSetupWorkflow().getWorkflowId() != null && !ast.getSetupWorkflow().getWorkflowId().isBlank()) {
+            SetupWorkflowConfig setupCfg = ast.getSetupWorkflow();
+            if (workflow.getId() != null && workflow.getId().toString().equals(setupCfg.getWorkflowId().trim())) {
+                throw new IllegalArgumentException("Circular setup workflow reference detected: workflow cannot reference itself as setup workflow");
+            }
+            WorkflowStep setupStep = new WorkflowStep();
+            setupStep.setId("step_setup_" + UUID.randomUUID().toString().replace("-", ""));
+            setupStep.setName(setupCfg.getWorkflowName() != null ? setupCfg.getWorkflowName() : "Setup Workflow");
+            setupStep.setType(StepType.SUB_WORKFLOW);
+            setupStep.setEnabled(true);
+
+            SubWorkflowStepConfig subConfig = new SubWorkflowStepConfig();
+            subConfig.setWorkflowId(setupCfg.getWorkflowId().trim());
+            subConfig.setWorkflowName(setupCfg.getWorkflowName());
+            subConfig.setInheritEnvAndSecrets(setupCfg.isInheritEnvAndSecrets());
+            subConfig.setInheritParentContext(true);
+            subConfig.setInheritFlowHeaders(true);
+            setupStep.setSubWorkflowConfig(subConfig);
+            if (setupCfg.getExtractions() != null) {
+                setupStep.setExtractions(new ArrayList<>(setupCfg.getExtractions()));
+            }
+            executableSteps.add(setupStep);
         }
+        if (ast != null && ast.getSteps() != null) {
+            executableSteps.addAll(ast.getSteps());
+        }
+
+        List<?> stepList = objectMapper.convertValue(executableSteps, List.class);
         workflowPayload.put("steps", stepList);
         workflowPayload.put("initialVariables", mergedVariables);
 

@@ -16,6 +16,7 @@ public class WorkflowAst implements Serializable {
     private Map<String, Map<String, String>> envSecrets = new LinkedHashMap<>();
     private Map<String, String> secrets = new LinkedHashMap<>();
     private Long timeoutMs = 60000L;
+    private SetupWorkflowConfig setupWorkflow;
 
     public WorkflowAst() {}
 
@@ -42,4 +43,7 @@ public class WorkflowAst implements Serializable {
 
     public Long getTimeoutMs() { return timeoutMs; }
     public void setTimeoutMs(Long timeoutMs) { this.timeoutMs = timeoutMs; }
+
+    public SetupWorkflowConfig getSetupWorkflow() { return setupWorkflow; }
+    public void setSetupWorkflow(SetupWorkflowConfig setupWorkflow) { this.setupWorkflow = setupWorkflow; }
 }

@@ -28,6 +28,7 @@ import com.orchestrator.platform.domain.enums.StepType;
 import com.orchestrator.platform.domain.model.ast.DbPollStepConfig;
 import com.orchestrator.platform.domain.model.ast.HttpRequestStepConfig;
 import com.orchestrator.platform.domain.model.ast.KafkaAssertStepConfig;
+import com.orchestrator.platform.domain.model.ast.SetupWorkflowConfig;
 import com.orchestrator.platform.domain.model.ast.StepAssertion;
 import com.orchestrator.platform.domain.model.ast.SubWorkflowStepConfig;
 import com.orchestrator.platform.domain.model.ast.TransformStepConfig;
@@ -144,6 +145,9 @@ public class TestWorkflowService {
                 if (ast.getSecrets().isEmpty() && !request.getCanvasState().getSecrets().isEmpty()) {
                     ast.setSecrets(new LinkedHashMap<>(request.getCanvasState().getSecrets()));
                 }
+                if (ast.getSetupWorkflow() == null && request.getCanvasState().getSetupWorkflow() != null) {
+                    ast.setSetupWorkflow(request.getCanvasState().getSetupWorkflow());
+                }
             }
             entity.setWorkflowAst(ast);
         } else if (request.getCanvasState() != null) {
@@ -185,6 +189,9 @@ public class TestWorkflowService {
                 if (ast.getSecrets().isEmpty() && !request.getCanvasState().getSecrets().isEmpty()) {
                     ast.setSecrets(new LinkedHashMap<>(request.getCanvasState().getSecrets()));
                 }
+                if (ast.getSetupWorkflow() == null && request.getCanvasState().getSetupWorkflow() != null) {
+                    ast.setSetupWorkflow(request.getCanvasState().getSetupWorkflow());
+                }
             }
             entity.setWorkflowAst(ast);
         }
@@ -219,9 +226,48 @@ public class TestWorkflowService {
 
         WorkflowAst ast = workflow.getWorkflowAst();
         if (ast != null && ast.getDefaultHeaders() != null && !ast.getDefaultHeaders().isEmpty()) {
-            for (Map.Entry<String, String> h : ast.getDefaultHeaders().entrySet()) {
-                sb.append("    * configure headers = karate.merge(karate.get('headers', {}), { '")
-                        .append(h.getKey()).append("': '").append(h.getValue()).append("' })\n");
+            boolean hasDynamicHeader = ast.getDefaultHeaders().values().stream().anyMatch(v -> v != null && v.contains("${"));
+            if (hasDynamicHeader) {
+                sb.append("    # Dynamic Flow Headers Evaluator\n");
+                sb.append("    * def resolveDynamicHeader =\n");
+                sb.append("      \"\"\"\n");
+                sb.append("      function(template) {\n");
+                sb.append("        if (!template || template.indexOf('${') === -1) return template;\n");
+                sb.append("        return template.replace(/\\$\\{([^}]+)\\}/g, function(match, key) {\n");
+                sb.append("          var k = key.trim();\n");
+                sb.append("          if (k.indexOf('$env:') === 0 || k.indexOf('env:') === 0) {\n");
+                sb.append("            var ek = k.substring(k.indexOf(':') + 1).trim();\n");
+                sb.append("            return karate.properties[ek] || java.lang.System.getenv(ek) || match;\n");
+                sb.append("          }\n");
+                sb.append("          if (k.indexOf('$secret:') === 0 || k.indexOf('secret:') === 0) {\n");
+                sb.append("            var sk = k.substring(k.indexOf(':') + 1).trim();\n");
+                sb.append("            return karate.properties[sk] || java.lang.System.getenv(sk) || match;\n");
+                sb.append("          }\n");
+                sb.append("          var val = karate.get(k);\n");
+                sb.append("          if (val === null || val === undefined) {\n");
+                sb.append("            val = (typeof context !== 'undefined' && context[k] !== undefined) ? context[k] : match;\n");
+                sb.append("          }\n");
+                sb.append("          return val;\n");
+                sb.append("        });\n");
+                sb.append("      }\n");
+                sb.append("      \"\"\"\n");
+                sb.append("    * configure headers =\n");
+                sb.append("      \"\"\"\n");
+                sb.append("      function() {\n");
+                sb.append("        var h = karate.get('headers', {});\n");
+                for (Map.Entry<String, String> h : ast.getDefaultHeaders().entrySet()) {
+                    String escapedKey = h.getKey().replace("'", "\\'");
+                    String escapedVal = h.getValue().replace("'", "\\'");
+                    sb.append("        h['").append(escapedKey).append("'] = resolveDynamicHeader('").append(escapedVal).append("');\n");
+                }
+                sb.append("        return h;\n");
+                sb.append("      }\n");
+                sb.append("      \"\"\"\n");
+            } else {
+                for (Map.Entry<String, String> h : ast.getDefaultHeaders().entrySet()) {
+                    sb.append("    * configure headers = karate.merge(karate.get('headers', {}), { '")
+                            .append(h.getKey()).append("': '").append(h.getValue()).append("' })\n");
+                }
             }
         }
         sb.append("\n");
@@ -229,6 +275,23 @@ public class TestWorkflowService {
         List<WorkflowStep> steps = ast != null && ast.getSteps() != null ? ast.getSteps() : Collections.emptyList();
         Set<UUID> dbCheckVisited = new HashSet<>();
         dbCheckVisited.add(id);
+
+        if (ast != null && ast.getSetupWorkflow() != null && ast.getSetupWorkflow().isEnabled()
+                && ast.getSetupWorkflow().getWorkflowId() != null && !ast.getSetupWorkflow().getWorkflowId().isBlank()) {
+            try {
+                UUID setupId = UUID.fromString(ast.getSetupWorkflow().getWorkflowId().trim());
+                if (!dbCheckVisited.contains(setupId)) {
+                    dbCheckVisited.add(setupId);
+                    TestWorkflowEntity setupEntity = workflowRepository.findById(setupId).orElse(null);
+                    if (setupEntity != null && setupEntity.getWorkflowAst() != null) {
+                        if (hasDbStepsRecursively(setupEntity.getWorkflowAst().getSteps(), dbCheckVisited)) {
+                            hasDbStepsRecursively(setupEntity.getWorkflowAst().getSteps(), dbCheckVisited);
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
         boolean hasDbSteps = hasDbStepsRecursively(steps, dbCheckVisited);
 
         if (hasDbSteps) {
@@ -341,6 +404,43 @@ public class TestWorkflowService {
         Set<UUID> visitedWorkflows = new HashSet<>();
         visitedWorkflows.add(id);
         AtomicInteger stepIndex = new AtomicInteger(1);
+
+        if (ast != null && ast.getSetupWorkflow() != null && ast.getSetupWorkflow().isEnabled()
+                && ast.getSetupWorkflow().getWorkflowId() != null && !ast.getSetupWorkflow().getWorkflowId().isBlank()) {
+            SetupWorkflowConfig setupCfg = ast.getSetupWorkflow();
+            try {
+                UUID setupId = UUID.fromString(setupCfg.getWorkflowId().trim());
+                if (!visitedWorkflows.contains(setupId)) {
+                    TestWorkflowEntity setupEntity = workflowRepository.findById(setupId).orElse(null);
+                    if (setupEntity != null && setupEntity.getWorkflowAst() != null) {
+                        sb.append("    # --- Begin Setup Workflow: ").append(setupEntity.getName()).append(" (ID: ").append(setupId).append(") ---\n");
+                        visitedWorkflows.add(setupId);
+                        renderSteps(sb, setupEntity.getWorkflowAst().getSteps(), visitedWorkflows, stepIndex);
+                        if (setupCfg.getExtractions() != null && !setupCfg.getExtractions().isEmpty()) {
+                            sb.append("    # Variable Extractions from Setup Workflow\n");
+                            for (VariableExtraction ext : setupCfg.getExtractions()) {
+                                String varName = ext.getVariableName();
+                                String source = ext.getSource();
+                                String path = cleanDbColumnPath(ext.getJsonPath());
+                                if (varName != null && !varName.isBlank() && !path.isBlank()) {
+                                    if ("SUB_WORKFLOW_VARIABLE".equalsIgnoreCase(source) || "SUB_WORKFLOW".equalsIgnoreCase(source)) {
+                                        sb.append("    * def ").append(varName).append(" = karate.get('").append(path).append("')\n");
+                                        sb.append("    * eval context['").append(varName).append("'] = karate.get('").append(varName).append("')\n");
+                                    } else if ("RESPONSE_BODY".equalsIgnoreCase(source)) {
+                                        sb.append("    * def ").append(varName).append(" = karate.jsonPath(response, '").append(ext.getJsonPath()).append("')\n");
+                                        sb.append("    * eval context['").append(varName).append("'] = karate.get('").append(varName).append("')\n");
+                                    }
+                                }
+                            }
+                        }
+                        sb.append("    # --- End Setup Workflow: ").append(setupEntity.getName()).append(" ---\n\n");
+                    }
+                }
+            } catch (Exception e) {
+                sb.append("    # [ERROR RESOLVING SETUP WORKFLOW: ").append(e.getMessage()).append("]\n\n");
+            }
+        }
+
         renderSteps(sb, steps, visitedWorkflows, stepIndex);
 
         return sb.toString();
@@ -777,6 +877,7 @@ public class TestWorkflowService {
             if (canvasState.getEnvSecrets() != null) ast.setEnvSecrets(new LinkedHashMap<>(canvasState.getEnvSecrets()));
             if (canvasState.getSecrets() != null) ast.setSecrets(new LinkedHashMap<>(canvasState.getSecrets()));
             if (canvasState.getVariables() != null) ast.setVariables(new HashMap<>(canvasState.getVariables()));
+            if (canvasState.getSetupWorkflow() != null) ast.setSetupWorkflow(canvasState.getSetupWorkflow());
         }
         return ast;
     }

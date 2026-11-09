@@ -186,6 +186,44 @@ public class DynamicKarateBridge {
     }
 
     @SuppressWarnings("unchecked")
+    public static Map<String, Object> computeEffectiveHeaders(String executionId,
+                                                              Map<String, Object> flowHeaders,
+                                                              Map<String, Object> stepConfig,
+                                                              Map<String, Object> globalContext) {
+        Map<String, Object> activeContext = new ConcurrentHashMap<>();
+        if (executionId != null && activeContexts.containsKey(executionId)) {
+            activeContext.putAll(activeContexts.get(executionId));
+        }
+        if (globalContext != null) {
+            activeContext.putAll(globalContext);
+        }
+
+        Map<String, Object> resolvedFlowHeaders = new LinkedHashMap<>();
+        if (flowHeaders != null) {
+            for (Map.Entry<String, Object> entry : flowHeaders.entrySet()) {
+                if (entry.getValue() != null) {
+                    String valStr = entry.getValue().toString();
+                    if (valStr.contains("${") && instance != null && instance.contextEngine != null) {
+                        try {
+                            String resolved = instance.contextEngine.resolveString(valStr, activeContext);
+                            resolvedFlowHeaders.put(entry.getKey(), resolved);
+                        } catch (Exception e) {
+                            log.warn("Failed to resolve dynamic header [{}]: {}", entry.getKey(), e.getMessage());
+                            resolvedFlowHeaders.put(entry.getKey(), valStr);
+                        }
+                    } else {
+                        resolvedFlowHeaders.put(entry.getKey(), entry.getValue());
+                    }
+                } else {
+                    resolvedFlowHeaders.put(entry.getKey(), null);
+                }
+            }
+        }
+
+        return computeEffectiveHeaders(resolvedFlowHeaders, stepConfig);
+    }
+
+    @SuppressWarnings("unchecked")
     public static Map<String, Object> computeEffectiveHeaders(Map<String, Object> flowHeaders, Map<String, Object> stepConfig) {
         if (stepConfig == null) {
             return flowHeaders != null ? new LinkedHashMap<>(flowHeaders) : new LinkedHashMap<>();

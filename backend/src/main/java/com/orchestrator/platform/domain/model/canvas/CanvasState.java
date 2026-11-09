@@ -7,6 +7,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.orchestrator.platform.domain.model.ast.SetupWorkflowConfig;
+
 public class CanvasState implements Serializable {
     private List<CanvasNode> nodes = new ArrayList<>();
     private List<CanvasEdge> edges = new ArrayList<>();
@@ -17,6 +19,7 @@ public class CanvasState implements Serializable {
     private Map<String, Map<String, String>> envSecrets = new LinkedHashMap<>();
     private Map<String, String> secrets = new LinkedHashMap<>();
     private Map<String, Object> variables = new HashMap<>();
+    private SetupWorkflowConfig setupWorkflow;
 
     public CanvasState() {}
 
@@ -46,4 +49,7 @@ public class CanvasState implements Serializable {
 
     public Map<String, Object> getVariables() { return variables; }
     public void setVariables(Map<String, Object> variables) { this.variables = variables; }
+
+    public SetupWorkflowConfig getSetupWorkflow() { return setupWorkflow; }
+    public void setSetupWorkflow(SetupWorkflowConfig setupWorkflow) { this.setupWorkflow = setupWorkflow; }
 }

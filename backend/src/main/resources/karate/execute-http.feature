@@ -8,7 +8,8 @@ Feature: Execute HTTP Request Step
     * def expectedStatus = httpCfg.expectedStatus || 200
     * def continueOnFailure = resolvedStep.continueOnFailure || false
     * def fHeaders = karate.get('flowHeaders') || {}
-    * def mergedHeaders = Bridge.computeEffectiveHeaders(fHeaders, httpCfg)
+    * def gContext = karate.get('globalContext') || {}
+    * def mergedHeaders = Bridge.computeEffectiveHeaders(executionId, fHeaders, httpCfg, gContext)
 
   Scenario: Run HTTP Step
     * if (continueOnFailure) karate.configure('continueOnStepFailure', true)
