@@ -60,7 +60,10 @@ Plans:
 **UI hint**: yes
 
 Plans:
+**Wave 1**
 - [ ] 05-01-PLAN.md — Backend Dynamic Header Promotion, Setup Workflow Execution & Standalone Export Parity
+
+**Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 05-02-PLAN.md — Frontend Setup Workflow Settings, Canvas Badges & Upstream Variable Autocomplete
 
 ## Progress

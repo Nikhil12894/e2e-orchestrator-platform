@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 milestone: v1.1
 milestone_name: Execution Status & Report URLs for cURL / CI/CD
-current_phase: 05
-current_phase_name: CI/CD Webhook Modal & Pipeline Snippets
+current_phase: 5
+current_phase_name: Sub-Workflow Variable Promotion & Global Flow Headers
 status: executing
-stopped_at: Phase 04 complete, ready to plan Phase 5
-last_updated: "2026-11-08T03:42:20.538Z"
-last_activity: 2026-11-08
-last_activity_desc: Phase 04 complete, transitioned to Phase 5
-state_head: 67746a0b4ccd1d8207b90e821735700cd38bcb6c
+stopped_at: Phase 5 scope updated, ready to plan
+last_updated: "2026-11-09T17:02:37.373Z"
+last_activity: 2026-11-09
+last_activity_desc: Updated Phase 5 scope to Sub-Workflow Variable Promotion & Global Flow Headers
+state_head: 9270e3793c6b4edd17e585d6538ea21cdeb30d12
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 3
+  total_plans: 4
   completed_plans: 2
 ---
 
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-07)
 
 **Core value:** Ensure complete functional parity and execution fidelity between visual workflows, dynamic in-memory Karate execution, and standalone exported Karate `.feature` files, while providing frictionless execution status tracking and direct HTML report access for automated pipelines and terminal users.
-**Current focus:** Phase 04 — Synchronous Wait Execution Mode
+**Current focus:** Phase 05 — Sub-Workflow Variable Promotion & Global Flow Headers
 
 ## Current Position
 
-Phase: 05 (CI/CD Webhook Modal & Pipeline Snippets) — READY TO EXECUTE
+Phase: 5 (Sub-Workflow Variable Promotion & Global Flow Headers) — READY TO EXECUTE
 Plan: Not started
 Status: Ready to execute
-Last activity: 2026-11-08 — Phase 04 complete, transitioned to Phase 5
+Last activity: 2026-11-09 — Updated Phase 5 scope to Sub-Workflow Variable Promotion & Global Flow Headers
 
 Progress: [███████░░░] 67%
 
@@ -104,4 +104,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Plan Phase 4 with `/gsd-plan-phase 4`
+- Plan Phase 5 with `/gsd-plan-phase 5`
