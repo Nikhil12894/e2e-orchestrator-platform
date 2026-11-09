@@ -253,7 +253,9 @@ export function App() {
           defaultHeaders: extraPatch?.canvasState?.defaultHeaders ?? currentCanvas.defaultHeaders,
           dynamicHeaders: extraPatch?.canvasState?.dynamicHeaders ?? currentCanvas.dynamicHeaders,
           envProperties: extraPatch?.canvasState?.envProperties ?? currentCanvas.envProperties,
+          envSecrets: extraPatch?.canvasState?.envSecrets ?? currentCanvas.envSecrets,
           secrets: extraPatch?.canvasState?.secrets ?? currentCanvas.secrets,
+          setupWorkflow: extraPatch?.canvasState?.setupWorkflow ?? currentCanvas.setupWorkflow,
         },
       });
 

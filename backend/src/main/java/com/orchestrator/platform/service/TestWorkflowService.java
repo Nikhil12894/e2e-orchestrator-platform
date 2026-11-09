@@ -225,8 +225,16 @@ public class TestWorkflowService {
         sb.append("    * def context = {}\n");
 
         WorkflowAst ast = workflow.getWorkflowAst();
-        if (ast != null && ast.getDefaultHeaders() != null && !ast.getDefaultHeaders().isEmpty()) {
-            boolean hasDynamicHeader = ast.getDefaultHeaders().values().stream().anyMatch(v -> v != null && v.contains("${"));
+        Map<String, String> flowHeaders = new LinkedHashMap<>();
+        if (ast != null && ast.getDefaultHeaders() != null) {
+            flowHeaders.putAll(ast.getDefaultHeaders());
+        }
+        if (ast != null && ast.getDynamicHeaders() != null) {
+            flowHeaders.putAll(ast.getDynamicHeaders());
+        }
+
+        if (!flowHeaders.isEmpty()) {
+            boolean hasDynamicHeader = flowHeaders.values().stream().anyMatch(v -> v != null && v.contains("${"));
             if (hasDynamicHeader) {
                 sb.append("    # Dynamic Flow Headers Evaluator\n");
                 sb.append("    * def resolveDynamicHeader =\n");
@@ -255,7 +263,7 @@ public class TestWorkflowService {
                 sb.append("      \"\"\"\n");
                 sb.append("      function() {\n");
                 sb.append("        var h = karate.get('headers', {});\n");
-                for (Map.Entry<String, String> h : ast.getDefaultHeaders().entrySet()) {
+                for (Map.Entry<String, String> h : flowHeaders.entrySet()) {
                     String escapedKey = h.getKey().replace("'", "\\'");
                     String escapedVal = h.getValue().replace("'", "\\'");
                     sb.append("        h['").append(escapedKey).append("'] = resolveDynamicHeader('").append(escapedVal).append("');\n");
@@ -264,7 +272,7 @@ public class TestWorkflowService {
                 sb.append("      }\n");
                 sb.append("      \"\"\"\n");
             } else {
-                for (Map.Entry<String, String> h : ast.getDefaultHeaders().entrySet()) {
+                for (Map.Entry<String, String> h : flowHeaders.entrySet()) {
                     sb.append("    * configure headers = karate.merge(karate.get('headers', {}), { '")
                             .append(h.getKey()).append("': '").append(h.getValue()).append("' })\n");
                 }
