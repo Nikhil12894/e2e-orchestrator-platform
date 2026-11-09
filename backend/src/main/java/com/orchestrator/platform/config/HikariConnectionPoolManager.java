@@ -245,6 +245,10 @@ public class HikariConnectionPoolManager {
             return "org.h2.Driver";
         } else if (lower.startsWith("jdbc:sqlserver:")) {
             return "com.microsoft.sqlserver.jdbc.SQLServerDriver";
+        } else if (lower.startsWith("jdbc:mariadb:")) {
+            return "org.mariadb.jdbc.Driver";
+        } else if (lower.startsWith("jdbc:sqlite:")) {
+            return "org.sqlite.JDBC";
         }
         return null;
     }

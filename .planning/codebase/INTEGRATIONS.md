@@ -36,9 +36,10 @@ last_mapped_at: 2026-11-06
   - Client: Spring Data JPA / Hibernate 6 with Flyway migrations (`backend/src/main/resources/db/migration/V1__init_orchestrator_schema.sql`)
   - Tables: `api_endpoint_catalog`, `test_workflows`, `workflow_executions`
 - External Target Databases (Under Test):
-  - Supported: PostgreSQL, Oracle Database (`ojdbc17`), H2 (`com.h2database:h2`)
+  - Supported: PostgreSQL (`postgresql:42.7.4`), MySQL (`mysql-connector-j:9.1.0`), Microsoft SQL Server (`mssql-jdbc:12.8.1.jre11`), Oracle Database (`ojdbc17`), MariaDB (`mariadb-java-client:3.5.0`), SQLite (`sqlite-jdbc:3.47.0.0`), and H2 (`h2:2.3.232`)
+  - Dynamic Driver Loading: Arbitrary JDBC drivers can be supplied at runtime via `--driver-dir` or loaded dynamically via `DbHelper.loadDriversFromDir()`
   - Connection: Dynamic JDBC connection strings provided per-step (`DbPollStepConfig.jdbcUrl`)
-  - Client: `HikariCP` connection pool manager (`backend/src/main/java/com/orchestrator/platform/config/HikariConnectionPoolManager.java`)
+  - Client: `HikariCP` connection pool manager (`backend/src/main/java/com/orchestrator/platform/config/HikariConnectionPoolManager.java`) in-application; standalone zero-dependency `DbHelper` (`backend/src/main/java/com/orchestrator/platform/karate/DbHelper.java`) in exported Karate features and CLI runner
 
 **File Storage:**
 - Local Filesystem / Mounted Volume:

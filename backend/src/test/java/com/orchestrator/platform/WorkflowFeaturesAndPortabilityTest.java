@@ -829,4 +829,153 @@ public class WorkflowFeaturesAndPortabilityTest {
             Files.deleteIfExists(tempFeature);
         }
     }
+
+    @Test
+    @DisplayName("Verify Standalone Karate .feature export includes nested Sub-Workflow steps, variables, and DB helpers")
+    public void testStandaloneKarateFeatureExportSubWorkflow() throws Exception {
+        // 1. Create an in-memory H2 table for DB poll step inside child workflow
+        try (Connection conn = DriverManager.getConnection("jdbc:h2:mem:subwf_export_db;DB_CLOSE_DELAY=-1", "sa", "")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("CREATE TABLE IF NOT EXISTS audit_logs (id INT PRIMARY KEY, action VARCHAR(50), status VARCHAR(50))");
+                stmt.execute("DELETE FROM audit_logs");
+                stmt.execute("INSERT INTO audit_logs (id, action, status) VALUES (1, 'CHILD_ACTION', 'SUCCESS')");
+            }
+        }
+
+        // 2. Create Child Workflow with a Transform step and a DB Poll step
+        WorkflowCreateRequest childReq = new WorkflowCreateRequest();
+        childReq.setName("Child Modular Flow");
+
+        CanvasState childState = new CanvasState();
+        CanvasNode childNode1 = new CanvasNode();
+        childNode1.setId("child_transform_step");
+        childNode1.setType("transform");
+        childNode1.setPosition(new CanvasPosition(100, 100));
+        Map<String, Object> childData1 = new HashMap<>();
+        childData1.put("name", "Generate Child Auth");
+        childData1.put("script", "function(ctx) { return { authToken: 'SUB-TOKEN-888', childScope: 'READ_WRITE' }; }");
+        childNode1.setData(childData1);
+
+        CanvasNode childNode2 = new CanvasNode();
+        childNode2.setId("child_db_poll_step");
+        childNode2.setType("dbPoll");
+        childNode2.setPosition(new CanvasPosition(100, 250));
+        Map<String, Object> childData2 = new HashMap<>();
+        childData2.put("name", "Verify Audit In DB");
+        childData2.put("jdbcUrl", "jdbc:h2:mem:subwf_export_db;DB_CLOSE_DELAY=-1");
+        childData2.put("username", "sa");
+        childData2.put("password", "");
+        childData2.put("driverClassName", "org.h2.Driver");
+        childData2.put("query", "SELECT action, status FROM audit_logs WHERE id = 1");
+        childData2.put("condition", "row.status == 'SUCCESS'");
+        childNode2.setData(childData2);
+
+        childState.setNodes(List.of(childNode1, childNode2));
+        childReq.setCanvasState(childState);
+        TestWorkflowEntity childWf = workflowService.createWorkflow(childReq);
+
+        // 3. Create Parent Workflow with SUB_WORKFLOW step referencing Child, and a Transform step consuming extracted variables
+        WorkflowCreateRequest parentReq = new WorkflowCreateRequest();
+        parentReq.setName("Parent Modular Flow");
+
+        CanvasState parentState = new CanvasState();
+        CanvasNode subWfNode = new CanvasNode();
+        subWfNode.setId("parent_sub_wf_step");
+        subWfNode.setType("subWorkflow");
+        subWfNode.setPosition(new CanvasPosition(100, 100));
+        Map<String, Object> subWfData = new HashMap<>();
+        subWfData.put("name", "Call Child Modular Flow");
+        subWfData.put("workflowId", childWf.getId().toString());
+        subWfData.put("workflowName", childWf.getName());
+        subWfData.put("inputVariables", Map.of("role", "admin_tester"));
+        subWfData.put("extractions", List.of(
+                Map.of("variableName", "parentCapturedToken", "source", "SUB_WORKFLOW_VARIABLE", "jsonPath", "authToken")
+        ));
+        subWfNode.setData(subWfData);
+
+        CanvasNode verifyNode = new CanvasNode();
+        verifyNode.setId("parent_verify_step");
+        verifyNode.setType("transform");
+        verifyNode.setPosition(new CanvasPosition(100, 250));
+        Map<String, Object> verifyData = new HashMap<>();
+        verifyData.put("name", "Verify Extracted Token");
+        verifyData.put("script", "function(ctx) { if (ctx.parentCapturedToken !== 'SUB-TOKEN-888') throw new Error('Token mismatch'); return { verified: true }; }");
+        verifyNode.setData(verifyData);
+
+        parentState.setNodes(List.of(subWfNode, verifyNode));
+        parentReq.setCanvasState(parentState);
+        TestWorkflowEntity parentWf = workflowService.createWorkflow(parentReq);
+
+        // 4. Generate standalone feature file
+        String feature = workflowService.generateStandaloneKarateFeature(parentWf.getId());
+
+        // 5. Structural Assertions
+        assertTrue(feature.contains("Feature: Parent Modular Flow"), "Must have Feature name");
+        assertTrue(feature.contains("def dbQuery ="), "Background MUST contain dbQuery helper because child workflow has DB steps!");
+        assertTrue(feature.contains("def dbPoll ="), "Background MUST contain dbPoll helper because child workflow has DB steps!");
+        assertTrue(feature.contains("# --- Begin Sub-Workflow: Child Modular Flow"), "Must contain sub-workflow begin marker");
+        assertTrue(feature.contains("def role = 'admin_tester'"), "Must set input variables");
+        assertTrue(feature.contains("SUB-TOKEN-888"), "Must contain child transform script");
+        assertTrue(feature.contains("def dbConfig_child_db_poll_step ="), "Must contain child dbPoll step");
+        assertTrue(feature.contains("def parentCapturedToken = karate.get('authToken')"), "Must extract sub-workflow variable into parent scope");
+        assertTrue(feature.contains("# --- End Sub-Workflow: Child Modular Flow"), "Must contain sub-workflow end marker");
+
+        // 6. Execute standalone feature file through Karate Runner.path to verify 100% Gherkin execution fidelity
+        Path tempFeature = Files.createTempFile("standalone-subwf-test-", ".feature");
+        try {
+            Files.writeString(tempFeature, feature, StandardCharsets.UTF_8);
+            SuiteResult results = Runner.path(tempFeature.toAbsolutePath().toString())
+                    .outputHtmlReport(false)
+                    .parallel(1);
+
+            assertFalse(results.isFailed(), "Standalone sub-workflow execution failed: " + (results.getErrors() != null ? String.join("\n", results.getErrors()) : ""));
+            assertEquals(0, results.getScenarioFailedCount());
+        } finally {
+            Files.deleteIfExists(tempFeature);
+        }
+    }
+
+    @Test
+    @DisplayName("Verify Standalone Karate .feature export guards against circular Sub-Workflow references")
+    public void testStandaloneKarateFeatureExportSubWorkflowCircularReferenceGuard() {
+        // Create 2 workflows that reference each other
+        WorkflowCreateRequest wf1Req = new WorkflowCreateRequest();
+        wf1Req.setName("Circular Flow 1");
+        TestWorkflowEntity wf1 = workflowService.createWorkflow(wf1Req);
+
+        WorkflowCreateRequest wf2Req = new WorkflowCreateRequest();
+        wf2Req.setName("Circular Flow 2");
+        TestWorkflowEntity wf2 = workflowService.createWorkflow(wf2Req);
+
+        // wf1 calls wf2
+        CanvasState state1 = new CanvasState();
+        CanvasNode node1 = new CanvasNode();
+        node1.setId("node_call_2");
+        node1.setType("subWorkflow");
+        node1.setPosition(new CanvasPosition(100, 100));
+        node1.setData(Map.of("name", "Call Flow 2", "workflowId", wf2.getId().toString(), "workflowName", wf2.getName()));
+        state1.setNodes(List.of(node1));
+        WorkflowCreateRequest update1 = new WorkflowCreateRequest();
+        update1.setName(wf1.getName());
+        update1.setCanvasState(state1);
+        workflowService.updateWorkflow(wf1.getId(), update1);
+
+        // wf2 calls wf1
+        CanvasState state2 = new CanvasState();
+        CanvasNode node2 = new CanvasNode();
+        node2.setId("node_call_1");
+        node2.setType("subWorkflow");
+        node2.setPosition(new CanvasPosition(100, 100));
+        node2.setData(Map.of("name", "Call Flow 1", "workflowId", wf1.getId().toString(), "workflowName", wf1.getName()));
+        state2.setNodes(List.of(node2));
+        WorkflowCreateRequest update2 = new WorkflowCreateRequest();
+        update2.setName(wf2.getName());
+        update2.setCanvasState(state2);
+        workflowService.updateWorkflow(wf2.getId(), update2);
+
+        // Generate feature for wf1; should cleanly detect recursion without StackOverflowError
+        String feature = workflowService.generateStandaloneKarateFeature(wf1.getId());
+        assertNotNull(feature);
+        assertTrue(feature.contains("CIRCULAR SUB-WORKFLOW DETECTED"), "Must detect circular reference");
+    }
 }

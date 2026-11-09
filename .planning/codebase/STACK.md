@@ -63,7 +63,7 @@ last_mapped_at: 2026-11-06
 - `org.postgresql:postgresql` (v42.7+) - PostgreSQL JDBC driver for application persistence (`backend/pom.xml`)
 - `org.flywaydb:flyway-database-postgresql` - Database migration automation (`backend/src/main/resources/db/migration`)
 - `com.zaxxer:HikariCP` - Production connection pool manager for application and dynamic test steps (`backend/src/main/java/com/orchestrator/platform/config/HikariConnectionPoolManager.java`)
-- `com.oracle.database.jdbc:ojdbc17` & `com.h2database:h2` - JDBC drivers for database test steps (`backend/pom.xml`)
+- `com.oracle.database.jdbc:ojdbc17`, `com.mysql:mysql-connector-j`, `org.mariadb.jdbc:mariadb-java-client`, `com.microsoft.sqlserver:mssql-jdbc`, `org.xerial:sqlite-jdbc`, `com.h2database:h2` - Bundled universal JDBC drivers for database test steps (`backend/pom.xml`)
 - `org.springdoc:springdoc-openapi-starter-webmvc-ui` (v2.8.6) - Self-hosted Swagger UI and OpenAPI documentation at `/swagger-ui.html` (`backend/pom.xml`)
 - `lucide-react` (v0.453.0) - Icon set for canvas toolbar, sidebar, and modals (`frontend/package.json`)
 

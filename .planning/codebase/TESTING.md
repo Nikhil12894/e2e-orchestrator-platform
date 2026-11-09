@@ -19,9 +19,10 @@ last_mapped_at: 2026-11-06
 
 **Run Commands:**
 ```bash
-cd backend && mvn test                                      # Run all backend automated tests
-cd backend && mvn test -Dtest=DynamicKarateRunnerTest       # Run specific test suite
-cd backend && mvn test -Dtest=*Portability*                 # Run pattern-matched test suites
+cd backend && mvn test                                      # Run all backend automated tests (72 tests)
+cd backend && mvn test -Dtest=DbHelperTest                  # Run standalone DbHelper unit tests
+cd backend && mvn test -Dtest=WorkflowFeaturesAndPortabilityTest # Run feature export & portability tests
+cd backend && mvn test -Dtest=DynamicKarateRunnerTest       # Run specific dynamic execution test suite
 ```
 
 ## Test File Organization
@@ -30,7 +31,7 @@ cd backend && mvn test -Dtest=*Portability*                 # Run pattern-matche
 - Separate test directory: `backend/src/test/java/com/orchestrator/platform/`
 
 **Naming:**
-- Test classes end with `Test`: `DynamicKarateRunnerTest.java`, `WorkflowFeaturesAndPortabilityTest.java`, `DbExecutorAndReportExclusionTest.java`
+- Test classes end with `Test`: `DynamicKarateRunnerTest.java`, `WorkflowFeaturesAndPortabilityTest.java`, `DbHelperTest.java`
 
 **Structure:**
 ```
@@ -38,14 +39,18 @@ backend/src/test/
 ├── java/com/orchestrator/platform/
 │   ├── DynamicKarateRunnerTest.java                   # End-to-end dynamic Karate workflow tests
 │   ├── SubWorkflowCompositionTest.java                # Parent/child sub-workflow composition tests
-│   ├── WorkflowFeaturesAndPortabilityTest.java        # Feature/JSON export, cancellation, muting
+│   ├── WorkflowFeaturesAndPortabilityTest.java        # Feature/JSON export, nested sub-workflow export, circular guards
+│   ├── WorkflowExecutionNavigationUrlTest.java        # Location header, status/report/stream navigation URLs
+│   ├── WorkflowExecutionSyncModeTest.java             # Synchronous wait execution mode (?wait=true)
 │   ├── WorkflowContextEngineTest.java                 # Jayway JsonPath and macro variable tests
 │   ├── DbExecutorAndReportExclusionTest.java          # Multi-database query execution tests
 │   ├── ExecutionCleanupAndStorageReclamationTest.java # Report directory deletion & disk cleanup tests
 │   ├── FlywayReferenceWorkflowsTest.java              # Verification of Flyway seed workflows V1-V9
 │   ├── TestWorkflowServiceTest.java                   # Service layer CRUD and AST compilation tests
 │   ├── OpenApiCatalogServiceTest.java                 # Swagger spec parsing and payload generation
-│   └── E2EOrchestratorApplicationTests.java           # Spring application context load test
+│   ├── E2EOrchestratorApplicationTests.java           # Spring application context load test
+│   └── karate/
+│       └── DbHelperTest.java                          # Standalone DbHelper polling, query, update, driver detection tests
 └── resources/
     └── application-test.yml                           # In-memory H2 configuration for tests
 ```

@@ -3,6 +3,7 @@ package com.orchestrator.platform.service;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -10,7 +11,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -212,6 +215,7 @@ public class TestWorkflowService {
 
         sb.append("  Background:\n");
         sb.append("    * configure ssl = true\n");
+        sb.append("    * def context = {}\n");
 
         WorkflowAst ast = workflow.getWorkflowAst();
         if (ast != null && ast.getDefaultHeaders() != null && !ast.getDefaultHeaders().isEmpty()) {
@@ -223,8 +227,9 @@ public class TestWorkflowService {
         sb.append("\n");
 
         List<WorkflowStep> steps = ast != null && ast.getSteps() != null ? ast.getSteps() : Collections.emptyList();
-        boolean hasDbSteps = steps.stream()
-                .anyMatch(s -> s.getType() == StepType.DB_POLL && s.isEnabled());
+        Set<UUID> dbCheckVisited = new HashSet<>();
+        dbCheckVisited.add(id);
+        boolean hasDbSteps = hasDbStepsRecursively(steps, dbCheckVisited);
 
         if (hasDbSteps) {
             sb.append("    # Reusable Standalone JDBC Helper Functions\n");
@@ -333,13 +338,48 @@ public class TestWorkflowService {
         sb.append("\n");
 
         sb.append("  Scenario: Execute Workflow Steps\n");
-        int stepIdx = 1;
+        Set<UUID> visitedWorkflows = new HashSet<>();
+        visitedWorkflows.add(id);
+        AtomicInteger stepIndex = new AtomicInteger(1);
+        renderSteps(sb, steps, visitedWorkflows, stepIndex);
+
+        return sb.toString();
+    }
+
+    private boolean hasDbStepsRecursively(List<WorkflowStep> steps, Set<UUID> visited) {
+        if (steps == null || steps.isEmpty()) return false;
+        for (WorkflowStep s : steps) {
+            if (!s.isEnabled()) continue;
+            if (s.getType() == StepType.DB_POLL) return true;
+            if (s.getType() == StepType.SUB_WORKFLOW && s.getSubWorkflowConfig() != null) {
+                String subIdStr = s.getSubWorkflowConfig().getWorkflowId();
+                if (subIdStr != null && !subIdStr.isBlank()) {
+                    try {
+                        UUID subId = UUID.fromString(subIdStr.trim());
+                        if (!visited.contains(subId)) {
+                            visited.add(subId);
+                            TestWorkflowEntity subEntity = workflowRepository.findById(subId).orElse(null);
+                            if (subEntity != null && subEntity.getWorkflowAst() != null) {
+                                if (hasDbStepsRecursively(subEntity.getWorkflowAst().getSteps(), visited)) {
+                                    return true;
+                                }
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+        }
+        return false;
+    }
+
+    private void renderSteps(StringBuilder sb, List<WorkflowStep> steps, Set<UUID> visitedWorkflows, AtomicInteger stepIndex) {
+        if (steps == null || steps.isEmpty()) return;
         for (WorkflowStep step : steps) {
             if (!step.isEnabled()) {
                 sb.append("    # [MUTED / DISABLED] Scenario: ").append(step.getName()).append("\n\n");
                 continue;
             }
-            sb.append("    # Step ").append(stepIdx++).append(" - ").append(step.getName()).append("\n");
+            sb.append("    # Step ").append(stepIndex.getAndIncrement()).append(" - ").append(step.getName()).append("\n");
 
             if (step.getType() == StepType.HTTP_REQUEST && step.getHttpConfig() != null) {
                 HttpRequestStepConfig cfg = step.getHttpConfig();
@@ -387,6 +427,7 @@ public class TestWorkflowService {
                     for (VariableExtraction ext : step.getExtractions()) {
                         if ("RESPONSE_BODY".equalsIgnoreCase(ext.getSource())) {
                             sb.append("    * def ").append(ext.getVariableName()).append(" = karate.jsonPath(response, '").append(ext.getJsonPath()).append("')\n");
+                            sb.append("    * eval context['").append(ext.getVariableName()).append("'] = karate.get('").append(ext.getVariableName()).append("')\n");
                         }
                     }
                 }
@@ -394,7 +435,8 @@ public class TestWorkflowService {
                 sb.append("    * karate.pause(").append(step.getDelayMs() != null ? step.getDelayMs() : 1000).append(")\n");
             } else if (step.getType() == StepType.TRANSFORM && step.getTransformConfig() != null) {
                 sb.append("    * def transformFn = ").append(step.getTransformConfig().getScript()).append("\n");
-                sb.append("    * def transformResult = transformFn(karate.get('context', {}))\n");
+                sb.append("    * def transformResult = transformFn(context)\n");
+                sb.append("    * eval if (transformResult && typeof transformResult === 'object') { for (var k in transformResult) { karate.set(k, transformResult[k]); context[k] = transformResult[k]; } }\n");
             } else if (step.getType() == StepType.DB_POLL && step.getDbPollConfig() != null) {
                 DbPollStepConfig dbConfig = step.getDbPollConfig();
                 String safeStepId = step.getId() != null ? step.getId().replaceAll("[^a-zA-Z0-9_]", "_") : "db_poll";
@@ -508,15 +550,69 @@ public class TestWorkflowService {
                             String path = cleanDbColumnPath(ext.getJsonPath());
                             if (varName != null && !varName.isBlank() && !path.isBlank()) {
                                 sb.append("    * def ").append(varName).append(" = dbResult.rows[0].").append(path).append("\n");
+                                sb.append("    * eval context['").append(varName).append("'] = karate.get('").append(varName).append("')\n");
                             }
                         }
                     }
                 }
+            } else if (step.getType() == StepType.SUB_WORKFLOW && step.getSubWorkflowConfig() != null) {
+                SubWorkflowStepConfig subCfg = step.getSubWorkflowConfig();
+                if (subCfg.getWorkflowId() == null || subCfg.getWorkflowId().isBlank()) {
+                    sb.append("    # [SUB-WORKFLOW ERROR: No sub-workflow ID configured]\n");
+                } else {
+                    try {
+                        UUID subId = UUID.fromString(subCfg.getWorkflowId().trim());
+                        if (visitedWorkflows.contains(subId)) {
+                            sb.append("    # [CIRCULAR SUB-WORKFLOW DETECTED: ").append(subId).append(" - SKIPPED]\n");
+                        } else {
+                            TestWorkflowEntity subWf = workflowRepository.findById(subId).orElse(null);
+                            if (subWf == null || subWf.getWorkflowAst() == null) {
+                                sb.append("    # [SUB-WORKFLOW NOT FOUND: ").append(subId).append("]\n");
+                            } else {
+                                sb.append("    # --- Begin Sub-Workflow: ").append(subWf.getName()).append(" (ID: ").append(subId).append(") ---\n");
+                                if (subCfg.getInputVariables() != null && !subCfg.getInputVariables().isEmpty()) {
+                                    sb.append("    # Sub-Workflow Input Variables\n");
+                                    for (Map.Entry<String, Object> inputVar : subCfg.getInputVariables().entrySet()) {
+                                        String varName = inputVar.getKey();
+                                        Object rawVal = inputVar.getValue();
+                                        String valStr = rawVal != null ? String.valueOf(rawVal) : "";
+                                        sb.append("    * def ").append(varName).append(" = ").append(formatKarateExpression(valStr)).append("\n");
+                                        sb.append("    * eval context['").append(varName).append("'] = karate.get('").append(varName).append("')\n");
+                                    }
+                                }
+                                Set<UUID> nextVisited = new HashSet<>(visitedWorkflows);
+                                nextVisited.add(subId);
+                                renderSteps(sb, subWf.getWorkflowAst().getSteps(), nextVisited, stepIndex);
+
+                                if (step.getExtractions() != null && !step.getExtractions().isEmpty()) {
+                                    sb.append("    # Variable Extractions from Sub-Workflow\n");
+                                    for (VariableExtraction ext : step.getExtractions()) {
+                                        String varName = ext.getVariableName();
+                                        String source = ext.getSource();
+                                        String path = cleanDbColumnPath(ext.getJsonPath());
+                                        if (varName != null && !varName.isBlank() && !path.isBlank()) {
+                                            if ("SUB_WORKFLOW_VARIABLE".equalsIgnoreCase(source) || "SUB_WORKFLOW".equalsIgnoreCase(source)) {
+                                                sb.append("    * def ").append(varName).append(" = karate.get('").append(path).append("')\n");
+                                                sb.append("    * eval context['").append(varName).append("'] = karate.get('").append(varName).append("')\n");
+                                            } else if ("RESPONSE_BODY".equalsIgnoreCase(source)) {
+                                                sb.append("    * def ").append(varName).append(" = karate.jsonPath(response, '").append(ext.getJsonPath()).append("')\n");
+                                                sb.append("    * eval context['").append(varName).append("'] = karate.get('").append(varName).append("')\n");
+                                            }
+                                        }
+                                    }
+                                }
+                                sb.append("    # --- End Sub-Workflow: ").append(subWf.getName()).append(" ---\n");
+                            }
+                        }
+                    } catch (Exception e) {
+                        sb.append("    # [ERROR RESOLVING SUB-WORKFLOW: ").append(e.getMessage()).append("]\n");
+                    }
+                }
+            } else if (step.getType() == StepType.KAFKA_ASSERT) {
+                sb.append("    # [KAFKA_ASSERT: ").append(step.getName()).append(" (Kafka assertion requires live runner)]\n");
             }
             sb.append("\n");
         }
-
-        return sb.toString();
     }
 
     private String cleanDbColumnPath(String jsonPath) {

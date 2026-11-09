@@ -36,6 +36,8 @@ Ensure complete functional parity and execution fidelity between visual workflow
 - ✓ **Execution Navigation URLs (EXEC-01)**: Execution trigger (`POST /api/v1/workflows/{id}/execute`) and details (`GET /api/v1/executions/{id}`) responses provide absolute `statusUrl`, `reportUrl`, and `streamUrl` navigation URLs resolved against request origin / reverse-proxy headers — Phase 3
 - ✓ **Execution Location Header (EXEC-02)**: Execution trigger endpoint sets standard RFC 7231 `Location` response header matching the absolute `statusUrl` — Phase 3
 - ✓ **Synchronous Wait Execution Mode (EXEC-03)**: Workflow execution trigger endpoint supports `?wait=true` (with defensive `&timeoutSec=N` clamping), blocking on Java 25 Virtual Threads until execution completes and returning HTTP 200 with completed entity, final status, and populated `reportUrl`, or graceful HTTP 504/202 timeout continuation — Phase 4
+- ✓ **Standalone Karate Sub-Workflow Feature Export**: Inlines nested sub-workflows recursively into a single self-contained Karate feature, preserving context binding, variable scope isolation, and parent variable extraction while enforcing a visited-workflow guard to prevent circular references
+- ✓ **Universal Database Support & Standalone Karate CLI Runner**: Shaded standalone JAR (`meterflow-karate-standalone.jar`) bundling Karate Core 2.1.4, multi-database JDBC drivers (PostgreSQL, MySQL, SQL Server, Oracle, MariaDB, SQLite, H2), and dynamic `--driver-dir` JAR loading via `DbHelper` (`DbHelper.poll()`, `DbHelper.query()`, `DbHelper.executeUpdate()`)
 
 ### Active
 
@@ -71,6 +73,9 @@ Shipped v1.0 milestone delivering standalone Karate database polling export and 
 | Framework-managed proxy strategy `server.forward-headers-strategy: framework` | Standardizes reverse proxy URL adaptation via Spring's `ForwardedHeaderFilter` | ✓ Validated in Phase 3 |
 | Non-blocking Virtual Thread carrier unmounting with `CompletableFuture` | Allows synchronous callers to await completion without holding or pinning OS carrier threads | ✓ Validated in Phase 4 |
 | Defensive parameter clamping (1s-300s) on synchronous wait | Prevents connection starvation attacks while providing reliable timeouts | ✓ Validated in Phase 4 |
+| Recursive inlining with cycle guards for sub-workflow export | Emits a single self-contained `.feature` file without external feature path dependencies while preventing infinite recursion | ✓ Validated |
+| Zero-dependency `DbHelper` with `DriverManager.registerDriver` | Enables arbitrary external JDBC drivers via `--driver-dir` without requiring re-compilation or shading of uncommon drivers | ✓ Validated |
+| Dedicated `standalone-karate` Maven Shade profile with transformer override | Avoids collision with Spring Boot starter parent resource transformer while producing an optimized 129MB all-in-one Karate CLI runnable anywhere | ✓ Validated |
 
 ## Evolution
 

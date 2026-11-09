@@ -63,7 +63,7 @@ The End-to-End Test Workflow Orchestrator Platform is a full-stack developer too
 - `org.postgresql:postgresql` (v42.7+) - PostgreSQL JDBC driver for application persistence (`backend/pom.xml`)
 - `org.flywaydb:flyway-database-postgresql` - Database migration automation (`backend/src/main/resources/db/migration`)
 - `com.zaxxer:HikariCP` - Production connection pool manager for application and dynamic test steps (`backend/src/main/java/com/orchestrator/platform/config/HikariConnectionPoolManager.java`)
-- `com.oracle.database.jdbc:ojdbc17` & `com.h2database:h2` - JDBC drivers for database test steps (`backend/pom.xml`)
+- `com.oracle.database.jdbc:ojdbc17`, `com.mysql:mysql-connector-j`, `org.mariadb.jdbc:mariadb-java-client`, `com.microsoft.sqlserver:mssql-jdbc`, `org.xerial:sqlite-jdbc`, `com.h2database:h2` - Bundled universal JDBC drivers for database test steps (`backend/pom.xml`)
 - `org.springdoc:springdoc-openapi-starter-webmvc-ui` (v2.8.6) - Self-hosted Swagger UI and OpenAPI documentation at `/swagger-ui.html` (`backend/pom.xml`)
 - `lucide-react` (v0.453.0) - Icon set for canvas toolbar, sidebar, and modals (`frontend/package.json`)
 
@@ -186,12 +186,15 @@ The End-to-End Test Workflow Orchestrator Platform is a full-stack developer too
 | `NodeConfigDrawer` | Multi-panel configuration drawer allowing users to edit step parameters, headers, assertions, variable extractions, and retry policies | `frontend/src/components/drawer/NodeConfigDrawer.tsx` |
 | `LiveExecutionConsole` | Slide-up console displaying live execution progress, step status badges, streamed logs, and report viewer triggers | `frontend/src/components/console/LiveExecutionConsole.tsx` |
 | `layoutEngine` | Topological auto-layout engine based on Kahn's topological sort algorithm to hierarchically arrange nodes | `frontend/src/utils/layoutEngine.ts` |
+| `DbHelper` | Standalone zero-dependency JDBC polling, querying, and updating utility for Karate features with automatic driver detection and dynamic external driver loading | `backend/src/main/java/com/orchestrator/platform/karate/DbHelper.java` |
+| `KarateStandaloneMain` | Standalone executable CLI entry point bundling Karate Core 2.1.4, multi-database JDBC drivers, and dynamic external JAR loading via `--driver-dir` | `backend/src/main/java/com/orchestrator/platform/karate/standalone/KarateStandaloneMain.java` |
 
 ## Pattern Overview
 
 - **Asynchronous Non-Blocking Execution:** Runs on Java 25 Virtual Threads (`Executors.newVirtualThreadPerTaskExecutor()`), returning immediate HTTP 202 Accepted responses.
 - **Dynamic In-Memory Karate DSL Interop:** Test steps execute through reusable Karate feature templates (`execute-http.feature`, `execute-db.feature`, etc.) that pull runtime configuration directly from the Java runtime bridge (`DynamicKarateBridge`) without generating temporary test files for each step.
 - **Dual Representation (Canvas & AST):** The frontend stores visual UI node positions (`CanvasState`) and translates connections into an execution graph (`WorkflowAst`), persisted together in PostgreSQL JSONB columns.
+- **Standalone Self-Contained Feature Export & Universal DB Runner:** Workflows export to 100% self-contained Karate Gherkin feature files with recursive sub-workflow inlining, variable scope binding, and inline JDBC functions. For offline / terminal / CI execution, the `standalone-karate` profile packages `meterflow-karate-standalone.jar` bundling Karate Core 2.1.4, multi-database JDBC drivers (Postgres, MySQL, SQL Server, Oracle, MariaDB, SQLite, H2), and dynamic `--driver-dir` JAR loading via `DbHelper`.
 
 ## Layers
 
@@ -253,6 +256,11 @@ The End-to-End Test Workflow Orchestrator Platform is a full-stack developer too
 - Location: `backend/src/main/resources/karate/generic-flow-executor.feature`
 - Triggers: Executed by `DynamicKarateRunner` via `Runner.path(...)`
 - Responsibilities: Iterates through AST steps, conditionally executes specific feature files (`execute-http.feature`, `execute-db.feature`), and records metrics
+
+**Standalone Karate Runner (CLI):**
+- Location: `backend/src/main/java/com/orchestrator/platform/karate/standalone/KarateStandaloneMain.java`
+- Triggers: Running shaded JAR (`java -jar meterflow-karate-standalone.jar -f workflow.feature [--driver-dir /path/to/drivers]`)
+- Responsibilities: Scans driver directory, registers external JDBC drivers dynamically via `URLClassLoader`, displays terminal banner, and dispatches execution to Karate Core's CLI engine
 
 ## Architectural Constraints
 

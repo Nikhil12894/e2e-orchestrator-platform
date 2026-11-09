@@ -84,7 +84,7 @@ flowchart TD
 - **Concurrency Locking**: Utilizes Karate scenario-level synchronization (`@lock=workflow-execution`) preventing race conditions during parallel runs.
 - **Dynamic Branch Execution**:
   - `execute-http.feature`: Native Karate HTTP client executing dynamic URLs, verbs, headers, and payloads with JSONPath validation and retry polling.
-  - `execute-db.feature`: Polls SQL databases through dynamic HikariCP connection pools for **PostgreSQL**, **Oracle DB (`ojdbc17`)**, and **H2** until expectations match or timeout expires.
+  - `execute-db.feature`: Polls SQL databases through dynamic HikariCP connection pools for **PostgreSQL**, **MySQL**, **MariaDB**, **Oracle DB (`ojdbc17`)**, **Microsoft SQL Server**, **SQLite**, and **H2** until expectations match or timeout expires.
   - `execute-kafka.feature`: Consumes Kafka topic events and verifies JSON schema within configured timeouts.
   - `execute-delay.feature`: Non-blocking virtual thread pauses for asynchronous event queues.
   - `execute-transform.feature`: Executes custom JavaScript expressions for HMAC tokens, UUIDs, date math, and context shaping.
@@ -118,28 +118,69 @@ flowchart TD
   * method get
   ```
 
-### 5. Portability: Standalone Karate Export, JSON Backup, & CI/CD Webhooks
-- **Karate `.feature` Export**: One-click download of a production-ready, standalone Karate Gherkin feature file (`/api/v1/workflows/{id}/export/feature`) that can be executed directly in CLI or CI pipelines.
+### 5. Portability: Standalone Karate Export, Sub-Workflow Inlining & CI/CD Webhooks
+- **Karate `.feature` Export with Full Sub-Workflow Support**: One-click download of a production-ready, standalone Karate Gherkin feature file (`/api/v1/workflows/{id}/export/feature`) that can be executed directly in CLI or CI pipelines. When exporting workflows with **Sub-Workflow steps**, child workflows are recursively inlined with:
+  - Scoped input variable assignments (`* def key = val`)
+  - Sub-workflow boundary banners (`# --- Begin Sub-Workflow: Name ---`)
+  - Variable context synchronization across nested steps
+  - Output variable extractions mapped back to parent scope (`* def parentVar = childVar`)
+  - Automatic recursive detection of database steps to populate Background `dbQuery` / `dbPoll` helpers
+  - Circular reference protection guarding against infinite recursion
 - **Workflow JSON Export/Import**: Export clean JSON workflow definitions or import/clone existing workflows from JSON backups.
 - **CI/CD Webhook Generator Modal**: Instant copy-pasteable cURL commands with environment selectors (`default`, `staging`, `production`) for GitHub Actions, GitLab CI, and Jenkins webhooks.
 
-### 6. Granular HTTP Header Inheritance & Environment Secrets
+### 6. Universal Database Support & Standalone Karate CLI Runner
+- **Universal Pre-Packaged JDBC Drivers**: Built-in support for **PostgreSQL**, **MySQL**, **MariaDB**, **Oracle DB (`ojdbc17`)**, **Microsoft SQL Server (`mssql-jdbc`)**, **SQLite**, and **H2**.
+- **Dynamic External Driver Loading**: Use `--driver-dir=/path/to/drivers` or `-d <dir>` (or `METERFLOW_DRIVER_DIR`) to dynamically load any proprietary enterprise database driver (Snowflake, DB2, ClickHouse, BigQuery, Sybase) via runtime `URLClassLoader` without rebuilding.
+- **Built-in `DbHelper` Java Interop Utility**: Write clean, zero-boilerplate database polling and queries in any Karate feature:
+  ```gherkin
+  * def Db = Java.type('com.orchestrator.platform.karate.DbHelper')
+  * def pollRes =
+    \"\"\"
+    Db.poll({
+      jdbcUrl: 'jdbc:postgresql://localhost:5432/orders_db',
+      username: 'postgres',
+      password: 'password123',
+      query: 'SELECT id, status FROM orders WHERE id = 101',
+      condition: 'row.status == "COMPLETED"',
+      maxAttempts: 5,
+      intervalMs: 1000,
+      timeoutMs: 15000
+    })
+    \"\"\"
+  * match pollRes.matched == true
+  * match pollRes.row.status == 'COMPLETED'
+  ```
+- **Dedicated Standalone Fat JAR**:
+  ```bash
+  # Package standalone Karate JAR
+  cd backend
+  mvn package -Pstandalone-karate -DskipTests
+
+  # Run standalone features with universal DB support
+  java -jar backend/target/meterflow-karate-standalone.jar my-workflow.feature -e staging
+
+  # Run with extra third-party drivers
+  java -jar backend/target/meterflow-karate-standalone.jar --driver-dir=./drivers my-workflow.feature
+  ```
+
+### 7. Granular HTTP Header Inheritance & Environment Secrets
 - **Inheritance Modes per Step**:
   - `INHERIT_ALL`: Automatically merges workflow global headers with step-specific headers (step headers take precedence on collision).
   - `OVERRIDE_ALL`: Completely ignores workflow global headers and uses only the step's specific headers.
   - `CUSTOM_ONLY`: Explicit custom header list for high-security isolation.
 - **Dynamic Secret Injection**: Reference host or container environment variables seamlessly: `${$env:API_KEY}`, `${$env:DATABASE_PASSWORD}`.
 
-### 7. Storage Reclamation & Automated Report Retention Pruning
+### 8. Storage Reclamation & Automated Report Retention Pruning
 - **Automated Pruning**: Runs in the background upon workflow completion to keep only the latest $N$ executions per workflow (configured via `ORCHESTRATOR_RETENTION_MAX_RUNS_PER_WORKFLOW`, default: 3).
 - **Disk Space Reclamation**: Automatically purges orphaned Karate report directories and cleans up old database records.
 - **Storage Management Modal**: Inspect live disk usage statistics (`/api/v1/executions/storage-stats`) and perform one-click batch cleanups (`/api/v1/executions/cleanup`).
 
-### 8. Canvas Auto-Layout Engine (Topological Alignment)
+### 9. Canvas Auto-Layout Engine (Topological Alignment)
 - Pure TypeScript implementation of **Kahn's Topological Sort Algorithm** (`layoutEngine.ts`).
 - One-click **"Auto Align"** button in the canvas toolbar that automatically computes hierarchical level assignments and spaces nodes cleanly without overlap.
 
-### 9. Modern React 19 Frontend & Theme Engine
+### 10. Modern React 19 Frontend & Theme Engine
 - Built with **React 19**, **Tailwind CSS**, and **@xyflow/react** (React Flow).
 - **Theme Mode Switcher**: Seamless switching between **Dark**, **Light**, and **System Default** modes with zero Flash of Unstyled Content (FOUC).
 - **Optimized Bundle Splitting**: Modal components are dynamically code-split with Vite, keeping production chunk sizes under 165 kB with build times under 1.7 seconds.
@@ -270,7 +311,7 @@ The application will be live at:
 
 ## 🧪 Running Tests
 
-The test suite includes 23 automated tests covering the entire execution lifecycle, Karate bridge interop, and storage reclamation:
+The test suite includes 72 automated tests covering the entire execution lifecycle, Karate bridge interop, universal database execution, and storage reclamation:
 
 ```bash
 cd backend
@@ -278,10 +319,12 @@ mvn test
 ```
 
 ### Key Test Coverage
-- `WorkflowFeaturesAndPortabilityTest`: Standalone Karate `.feature` export, JSON export/import, mid-flight cancellation, JS transform node variable injection, step muting, and step retry configuration.
+- `WorkflowFeaturesAndPortabilityTest`: Standalone Karate `.feature` export, Sub-Workflow scenario inlining with variable extractions, circular reference protection, JSON export/import, mid-flight cancellation, form URL-encoded requests, step muting, and step retry configuration.
+- `DbHelperTest`: Universal database polling, expected row count matching, condition evaluation, timeout handling, DDL/DML update execution, token macro interpolation, and JDBC driver auto-detection across all engines.
+- `SubWorkflowCompositionTest`: In-memory modular sub-workflow execution, variable inheritance, scoped environment properties, and parent context variable extraction.
 - `DynamicKarateRunnerTest`: Multi-step end-to-end workflow execution with token extraction, variable chaining, status assertions, and HTML report generation.
 - `ExecutionCleanupAndStorageReclamationTest`: Automated report directory deletion, disk reclamation calculation, and batch execution purging.
-- `DbExecutorAndReportExclusionTest`: Multi-database query execution (PostgreSQL, Oracle DB, H2) and report exclusion flags.
+- `DbExecutorAndReportExclusionTest`: Multi-database query execution (PostgreSQL, MySQL, MariaDB, Oracle DB, SQL Server, SQLite, H2) and report exclusion flags.
 - `WorkflowContextEngineTest`: Macro evaluation (`${$timestamp}`, `${$randomUuid}`), `${$env:VAR}` resolution, and JSONPath extraction.
 
 ---
