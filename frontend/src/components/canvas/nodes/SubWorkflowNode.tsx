@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
-import { Workflow, CheckCircle2, XCircle, EyeOff, Layers, ArrowRight } from 'lucide-react';
+import { Workflow, CheckCircle2, XCircle, EyeOff, Layers, ArrowRight, Zap } from 'lucide-react';
 import { CanvasNodeData } from '../../../types/workflow';
 
 export const SubWorkflowNode = memo(({ data, selected }: NodeProps<any>) => {
@@ -74,6 +74,27 @@ export const SubWorkflowNode = memo(({ data, selected }: NodeProps<any>) => {
           <span className="truncate">{targetWfName || 'Select target workflow...'}</span>
         </div>
       </div>
+
+      {/* Exported Variables Badges */}
+      {extractionCount > 0 && (
+        <div className="mb-2 p-1.5 rounded-lg bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20">
+          <div className="flex items-center gap-1 text-[10px] font-medium text-amber-700 dark:text-amber-300 mb-1">
+            <Zap className="w-3 h-3 text-amber-500" />
+            <span>Exports ({extractionCount}):</span>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {(nodeData.extractions || []).map((ex, i) => (
+              <span
+                key={i}
+                title={`Source: ${ex.source || 'SUB_WORKFLOW_VARIABLE'} [${ex.jsonPath || ex.variableName}]`}
+                className="px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 font-mono text-[9px]"
+              >
+                ${`{${ex.variableName}}`}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Footer details & badges */}
       <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800/60">

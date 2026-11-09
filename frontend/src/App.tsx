@@ -24,6 +24,7 @@ import {
   CanvasNode,
   CanvasEdge,
   CanvasNodeData,
+  SetupWorkflowConfig,
 } from './types/workflow';
 
 const CreateWorkflowModal = React.lazy(() =>
@@ -426,6 +427,7 @@ export function App() {
     envProperties: Record<string, Record<string, any>>;
     envSecrets: Record<string, Record<string, string>>;
     secrets: Record<string, string>;
+    setupWorkflow?: SetupWorkflowConfig;
   }) => {
     if (!selectedWorkflow) return;
     await handleSaveWorkflow({
@@ -438,6 +440,7 @@ export function App() {
         envProperties: settings.envProperties,
         envSecrets: settings.envSecrets,
         secrets: settings.secrets,
+        setupWorkflow: settings.setupWorkflow,
       },
     });
   };

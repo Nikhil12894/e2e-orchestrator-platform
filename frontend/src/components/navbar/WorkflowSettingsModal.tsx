@@ -12,9 +12,11 @@ import {
   EyeOff,
   Sparkles,
   Info,
-  Check
+  Check,
+  Layers
 } from 'lucide-react';
-import { TestWorkflow } from '../../types/workflow';
+import { TestWorkflow, SetupWorkflowConfig, VariableExtraction } from '../../types/workflow';
+import { workflowApi } from '../../api/client';
 
 interface WorkflowSettingsModalProps {
   isOpen: boolean;
@@ -28,6 +30,7 @@ interface WorkflowSettingsModalProps {
     envProperties: Record<string, Record<string, any>>;
     envSecrets: Record<string, Record<string, string>>;
     secrets: Record<string, string>;
+    setupWorkflow?: SetupWorkflowConfig;
   }) => void;
   onDeleteWorkflow?: (workflowId: string) => void;
 }
@@ -39,11 +42,21 @@ export const WorkflowSettingsModal: React.FC<WorkflowSettingsModalProps> = ({
   onSaveSettings,
   onDeleteWorkflow,
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'defaultHeaders' | 'dynamicHeaders' | 'envProperties' | 'secrets'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'setupWorkflow' | 'defaultHeaders' | 'dynamicHeaders' | 'envProperties' | 'secrets'>('general');
 
   // Form states
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+
+  // Setup Workflow state
+  const [setupWorkflowEnabled, setSetupWorkflowEnabled] = useState(false);
+  const [setupWorkflowId, setSetupWorkflowId] = useState('');
+  const [setupWorkflowName, setSetupWorkflowName] = useState('');
+  const [setupInheritEnvAndSecrets, setSetupInheritEnvAndSecrets] = useState(true);
+  const [setupExtractions, setSetupExtractions] = useState<VariableExtraction[]>([]);
+  const [availableWorkflows, setAvailableWorkflows] = useState<TestWorkflow[]>([]);
+  const [isLoadingWorkflows, setIsLoadingWorkflows] = useState(false);
+  const [bearerAppliedNotice, setBearerAppliedNotice] = useState<string | null>(null);
 
   // Default Headers key-value list
   const [defaultHeadersList, setDefaultHeadersList] = useState<Array<{ key: string; value: string }>>([]);
@@ -112,7 +125,39 @@ export const WorkflowSettingsModal: React.FC<WorkflowSettingsModalProps> = ({
     }
     setEnvSecretsMap(parsedEnvSec);
     setRevealedSecrets({});
+
+    // Setup Workflow state initialization
+    const setupCfg = workflow.canvasState?.setupWorkflow || workflow.workflowAst?.setupWorkflow;
+    if (setupCfg) {
+      setSetupWorkflowEnabled(setupCfg.enabled !== false);
+      setSetupWorkflowId(setupCfg.workflowId || '');
+      setSetupWorkflowName(setupCfg.workflowName || '');
+      setSetupInheritEnvAndSecrets(setupCfg.inheritEnvAndSecrets !== false);
+      setSetupExtractions(setupCfg.extractions ? [...setupCfg.extractions] : []);
+    } else {
+      setSetupWorkflowEnabled(false);
+      setSetupWorkflowId('');
+      setSetupWorkflowName('');
+      setSetupInheritEnvAndSecrets(true);
+      setSetupExtractions([]);
+    }
   }, [workflow, isOpen]);
+
+  // Load available workflows for setup selection (excluding current workflow)
+  useEffect(() => {
+    if (!isOpen || !workflow) return;
+    setIsLoadingWorkflows(true);
+    workflowApi.getAllWorkflows()
+      .then((list) => {
+        setAvailableWorkflows(list.filter((w) => w.id !== workflow.id));
+      })
+      .catch((err) => {
+        console.error('Failed to load workflows for setup configuration', err);
+      })
+      .finally(() => {
+        setIsLoadingWorkflows(false);
+      });
+  }, [isOpen, workflow?.id]);
 
   if (!isOpen || !workflow) return null;
 
@@ -158,6 +203,16 @@ export const WorkflowSettingsModal: React.FC<WorkflowSettingsModalProps> = ({
       ...(envSecrets[selectedSecretEnv] || {}),
     };
 
+    const setupWorkflow: SetupWorkflowConfig | undefined = setupWorkflowId.trim()
+      ? {
+          workflowId: setupWorkflowId.trim(),
+          workflowName: setupWorkflowName || undefined,
+          enabled: setupWorkflowEnabled,
+          inheritEnvAndSecrets: setupInheritEnvAndSecrets,
+          extractions: setupExtractions.filter((e) => e.variableName && e.variableName.trim()),
+        }
+      : undefined;
+
     onSaveSettings({
       name: name.trim() || workflow.name,
       description: description.trim(),
@@ -166,6 +221,7 @@ export const WorkflowSettingsModal: React.FC<WorkflowSettingsModalProps> = ({
       envProperties,
       envSecrets,
       secrets,
+      setupWorkflow,
     });
     onClose();
   };
@@ -210,6 +266,21 @@ export const WorkflowSettingsModal: React.FC<WorkflowSettingsModalProps> = ({
             }`}
           >
             General
+          </button>
+
+          <button
+            onClick={() => setActiveTab('setupWorkflow')}
+            className={`px-3 py-2.5 text-xs font-medium border-b-2 flex items-center gap-1.5 transition-all ${
+              activeTab === 'setupWorkflow'
+                ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 font-semibold'
+                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            Setup Workflow
+            {setupWorkflowId && (
+              <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+            )}
           </button>
 
           <button
@@ -344,6 +415,239 @@ export const WorkflowSettingsModal: React.FC<WorkflowSettingsModalProps> = ({
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* TAB 2: Pre-requisite Setup Workflow */}
+          {activeTab === 'setupWorkflow' && (
+            <div className="space-y-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-indigo-500" />
+                    Pre-requisite Setup Workflow
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    Configure a pre-requisite workflow (e.g. Auth / Token Generation) that executes before canvas steps to seed global context.
+                  </p>
+                </div>
+                {setupWorkflowId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSetupWorkflowId('');
+                      setSetupWorkflowName('');
+                      setSetupWorkflowEnabled(false);
+                      setSetupExtractions([]);
+                    }}
+                    className="text-[11px] text-rose-500 hover:text-rose-400 flex items-center gap-1 transition-colors"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    Clear Setup
+                  </button>
+                )}
+              </div>
+
+              {/* Enable / Disable toggle */}
+              <div className="flex items-center gap-2.5 p-3 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
+                <input
+                  type="checkbox"
+                  id="enableSetupWorkflow"
+                  checked={setupWorkflowEnabled}
+                  onChange={(e) => setSetupWorkflowEnabled(e.target.checked)}
+                  className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                />
+                <label htmlFor="enableSetupWorkflow" className="text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                  Enable Pre-requisite Setup Execution
+                </label>
+              </div>
+
+              {/* Target Workflow Dropdown */}
+              <div>
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                  Target Workflow
+                </label>
+                <div className="relative">
+                  <select
+                    value={setupWorkflowId}
+                    onChange={(e) => {
+                      const selId = e.target.value;
+                      setSetupWorkflowId(selId);
+                      const targetWf = availableWorkflows.find((w) => w.id === selId);
+                      setSetupWorkflowName(targetWf?.name || '');
+                      if (selId && !setupWorkflowEnabled) {
+                        setSetupWorkflowEnabled(true);
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors"
+                  >
+                    <option value="">-- Select a Pre-requisite Workflow --</option>
+                    {availableWorkflows.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} ({w.id.substring(0, 8)}...)
+                      </option>
+                    ))}
+                  </select>
+                  {isLoadingWorkflows && (
+                    <span className="absolute right-8 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">
+                      Loading...
+                    </span>
+                  )}
+                </div>
+                {availableWorkflows.length === 0 && !isLoadingWorkflows && (
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    No other workflows found. Create another workflow to use it as a pre-requisite.
+                  </p>
+                )}
+              </div>
+
+              {/* Inherit Env & Secrets Checkbox */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="inheritEnvSecrets"
+                  checked={setupInheritEnvAndSecrets}
+                  onChange={(e) => setSetupInheritEnvAndSecrets(e.target.checked)}
+                  className="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500"
+                />
+                <label htmlFor="inheritEnvSecrets" className="text-xs text-slate-600 dark:text-slate-400 cursor-pointer">
+                  Inherit Environment Properties and Secrets into Setup Workflow
+                </label>
+              </div>
+
+              {/* Variable Promotion Section */}
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h5 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                      Exported Variables Promotion
+                    </h5>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Map child workflow output variables into parent global context.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {setupExtractions.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const tokenVar =
+                            setupExtractions.find((e) => /token|auth/i.test(e.variableName))?.variableName ||
+                            setupExtractions[0]?.variableName ||
+                            'authToken';
+                          const bearerVal = `Bearer \${${tokenVar}}`;
+                          setDefaultHeadersList((prev) => {
+                            const exists = prev.findIndex((h) => h.key.toLowerCase() === 'authorization');
+                            if (exists >= 0) {
+                              return prev.map((h, i) => (i === exists ? { ...h, value: bearerVal } : h));
+                            }
+                            return [...prev, { key: 'Authorization', value: bearerVal }];
+                          });
+                          setBearerAppliedNotice(`Applied Authorization: ${bearerVal}`);
+                          setTimeout(() => setBearerAppliedNotice(null), 3500);
+                        }}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 text-[11px] font-medium transition-colors"
+                        title="Auto-populate Authorization: Bearer ${...} in Global Headers"
+                      >
+                        <Sparkles className="w-3 h-3 text-indigo-500" />
+                        Apply as Bearer Authorization Header
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSetupExtractions((prev) => [
+                          ...prev,
+                          {
+                            variableName: 'authToken',
+                            source: 'SUB_WORKFLOW_VARIABLE',
+                            jsonPath: 'authToken',
+                          },
+                        ])
+                      }
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-medium transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add Variable
+                    </button>
+                  </div>
+                </div>
+
+                {bearerAppliedNotice && (
+                  <div className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-1.5 animate-in fade-in">
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{bearerAppliedNotice} (saved in Global Headers tab)</span>
+                  </div>
+                )}
+
+                {!setupWorkflowId ? (
+                  <div className="p-6 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50/50 dark:bg-slate-950/30">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      No pre-requisite workflow selected. The workflow will start directly from canvas Step 1.
+                    </p>
+                  </div>
+                ) : setupExtractions.length === 0 ? (
+                  <div className="p-6 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50/50 dark:bg-slate-950/30">
+                    <p className="text-xs text-slate-500 mb-1">
+                      No variable promotions mapped yet.
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      Add variables exported by the setup workflow (e.g. <span className="font-mono text-indigo-400">authToken</span>) to make them available in global headers and canvas steps.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-12 gap-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1">
+                      <span className="col-span-5">Parent Variable Name</span>
+                      <span className="col-span-6">Child Output Field / Name</span>
+                      <span className="col-span-1 text-right">Action</span>
+                    </div>
+                    {setupExtractions.map((item, idx) => (
+                      <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                        <div className="col-span-5">
+                          <input
+                            type="text"
+                            value={item.variableName}
+                            placeholder="e.g. authToken"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSetupExtractions((prev) =>
+                                prev.map((ex, i) => (i === idx ? { ...ex, variableName: val } : ex))
+                              );
+                            }}
+                            className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
+                          />
+                        </div>
+                        <div className="col-span-6">
+                          <input
+                            type="text"
+                            value={item.jsonPath}
+                            placeholder="e.g. authToken or token"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSetupExtractions((prev) =>
+                                prev.map((ex, i) => (i === idx ? { ...ex, jsonPath: val } : ex))
+                              );
+                            }}
+                            className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:border-indigo-500"
+                          />
+                        </div>
+                        <div className="col-span-1 text-right">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSetupExtractions((prev) => prev.filter((_, i) => i !== idx))
+                            }
+                            className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

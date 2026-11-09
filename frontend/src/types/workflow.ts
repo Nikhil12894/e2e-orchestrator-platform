@@ -69,6 +69,14 @@ export interface SubWorkflowStepConfig {
   inheritFlowHeaders?: boolean;
 }
 
+export interface SetupWorkflowConfig {
+  workflowId: string;
+  workflowName?: string;
+  enabled?: boolean;
+  inheritEnvAndSecrets?: boolean;
+  extractions?: VariableExtraction[];
+}
+
 export interface DbPollStepConfig {
   jdbcUrl: string;
   username?: string;
@@ -118,6 +126,7 @@ export interface WorkflowAst {
   envSecrets?: Record<string, Record<string, string>>;
   secrets?: Record<string, string>;
   timeoutMs?: number;
+  setupWorkflow?: SetupWorkflowConfig;
 }
 
 export interface CanvasPosition {
@@ -197,6 +206,7 @@ export interface CanvasState {
   envProperties?: Record<string, Record<string, any>>;
   envSecrets?: Record<string, Record<string, string>>;
   secrets?: Record<string, string>;
+  setupWorkflow?: SetupWorkflowConfig;
 }
 
 export interface TestWorkflow {

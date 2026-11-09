@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import {
   X,
   Settings,
@@ -25,7 +25,8 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Sparkles
 } from 'lucide-react';
 import { CanvasNode, CanvasNodeData, HttpMethod, StepAssertion, VariableExtraction } from '../../types/workflow';
 import { workflowApi } from '../../api/client';
@@ -275,29 +276,53 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
   }, {} as Record<string, number>);
   const duplicateKeys = Object.keys(keyCounts).filter((k) => keyCounts[k] > 1);
 
-  const handleInsertVariable = (varExpr: string) => {
-    if (!varTargetField) return;
+  // Upstream extracted variables from all other canvas nodes with extractions defined
+  const upstreamExportedVars = useMemo(() => {
+    if (!allNodes || !selectedNode) return [];
+    const vars: Array<{ variableName: string; sourceNodeName: string; jsonPath?: string }> = [];
+    const seen = new Set<string>();
 
-    if (varTargetField.startsWith('formParam_')) {
-      const idx = parseInt(varTargetField.substring(10), 10);
+    allNodes.forEach((node) => {
+      if (node.id === selectedNode.id) return;
+      const extractions = node.data?.extractions || [];
+      extractions.forEach((ex: VariableExtraction) => {
+        if (ex.variableName && !seen.has(ex.variableName)) {
+          seen.add(ex.variableName);
+          vars.push({
+            variableName: ex.variableName,
+            sourceNodeName: node.data?.name || node.type || 'Node',
+            jsonPath: ex.jsonPath,
+          });
+        }
+      });
+    });
+
+    return vars;
+  }, [allNodes, selectedNode]);
+
+  const insertVariableIntoField = (field: string, varExpr: string) => {
+    if (!field) return;
+
+    if (field.startsWith('formParam_')) {
+      const idx = parseInt(field.substring(10), 10);
       if (!isNaN(idx) && formRows[idx]) {
         const newVal = (formRows[idx]?.value || '') + varExpr;
         handleUpdateFormRow(idx, 'value', newVal);
       }
-    } else if (varTargetField === 'url') {
+    } else if (field === 'url') {
       update({ url: (data.url || '') + varExpr });
-    } else if (varTargetField === 'jdbcUrl') {
+    } else if (field === 'jdbcUrl') {
       update({ jdbcUrl: (data.jdbcUrl || '') + varExpr });
-    } else if (varTargetField === 'username') {
+    } else if (field === 'username') {
       update({ username: (data.username || '') + varExpr });
-    } else if (varTargetField === 'password') {
+    } else if (field === 'password') {
       update({ password: (data.password || '') + varExpr });
-    } else if (varTargetField === 'query') {
+    } else if (field === 'query') {
       update({ query: (data.query || '') + varExpr });
-    } else if (varTargetField === 'condition') {
+    } else if (field === 'condition') {
       update({ condition: (data.condition || '') + varExpr });
-    } else if (varTargetField.startsWith('header_')) {
-      const hKey = varTargetField.substring(7);
+    } else if (field.startsWith('header_')) {
+      const hKey = field.substring(7);
       const currentVal = (data.headers || {})[hKey] || '';
       update({
         headers: {
@@ -305,12 +330,12 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
           [hKey]: currentVal + varExpr,
         },
       });
-    } else if (varTargetField.startsWith('param_')) {
-      const pKey = varTargetField.substring(6);
+    } else if (field.startsWith('param_')) {
+      const pKey = field.substring(6);
       const curVars = { ...(data.inputVariables || {}) };
       curVars[pKey] = (curVars[pKey] || '') + varExpr;
       update({ inputVariables: curVars });
-    } else if (varTargetField === 'body') {
+    } else if (field === 'body') {
       try {
         const bodyStr = typeof data.body === 'string' ? data.body : JSON.stringify(data.body, null, 2);
         update({ body: bodyStr + varExpr });
@@ -318,6 +343,36 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
         update({ body: varExpr });
       }
     }
+  };
+
+  const handleInsertVariable = (varExpr: string) => {
+    if (varTargetField) {
+      insertVariableIntoField(varTargetField, varExpr);
+    }
+  };
+
+  const renderVariableSuggestions = (targetField: string) => {
+    if (upstreamExportedVars.length === 0) return null;
+    return (
+      <div className="flex items-center gap-1.5 flex-wrap my-1">
+        <span className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+          <Sparkles className="w-2.5 h-2.5 text-amber-500" />
+          Insert var:
+        </span>
+        {upstreamExportedVars.map((v) => (
+          <button
+            key={v.variableName}
+            type="button"
+            onClick={() => insertVariableIntoField(targetField, `\${${v.variableName}}`)}
+            title={`From "${v.sourceNodeName}" (${v.jsonPath || v.variableName}) - Click to insert`}
+            className="px-1.5 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-600 dark:text-amber-400 font-mono text-[9px] flex items-center gap-0.5 transition-colors"
+          >
+            <span>+</span>
+            <span>{`\${${v.variableName}}`}</span>
+          </button>
+        ))}
+      </div>
+    );
   };
 
   const handleSelectBodyType = (type: 'JSON' | 'FORM_URL_ENCODED') => {
@@ -559,6 +614,7 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                 <>
                   <div>
                     <label className="block text-[11px] font-medium text-slate-300 mb-1">Method & URL</label>
+                    {renderVariableSuggestions('url')}
                     <div className="flex gap-2">
                       <select
                         value={data.method || 'GET'}
@@ -759,62 +815,65 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                       {Object.keys(data.headers || {}).length === 0 ? (
                         <p className="text-[10px] text-slate-500 italic py-1">No custom headers added for this step.</p>
                       ) : (
-                        <div className="space-y-1.5">
+                        <div className="space-y-2">
                           {Object.entries(data.headers || {}).map(([hKey, hVal], hIdx) => (
-                            <div key={hIdx} className="flex items-center gap-1.5">
-                              <input
-                                type="text"
-                                value={hKey}
-                                placeholder="Header-Name"
-                                onChange={(e) => {
-                                  const newKey = e.target.value;
-                                  const newHeaders: Record<string, string> = {};
-                                  Object.entries(data.headers || {}).forEach(([k, v]) => {
-                                    if (k === hKey) {
-                                      newHeaders[newKey] = v;
-                                    } else {
-                                      newHeaders[k] = v;
-                                    }
-                                  });
-                                  update({ headers: newHeaders });
-                                }}
-                                className="w-1/2 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
-                              />
-                              <div className="flex-1 relative">
+                            <div key={hIdx} className="space-y-1">
+                              <div className="flex items-center gap-1.5">
                                 <input
                                   type="text"
-                                  value={hVal}
-                                  placeholder="Header-Value"
+                                  value={hKey}
+                                  placeholder="Header-Name"
                                   onChange={(e) => {
-                                    update({
-                                      headers: {
-                                        ...(data.headers || {}),
-                                        [hKey]: e.target.value,
-                                      },
+                                    const newKey = e.target.value;
+                                    const newHeaders: Record<string, string> = {};
+                                    Object.entries(data.headers || {}).forEach(([k, v]) => {
+                                      if (k === hKey) {
+                                        newHeaders[newKey] = v;
+                                      } else {
+                                        newHeaders[k] = v;
+                                      }
                                     });
+                                    update({ headers: newHeaders });
                                   }}
-                                  className="w-full pr-6 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
+                                  className="w-1/2 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
                                 />
+                                <div className="flex-1 relative">
+                                  <input
+                                    type="text"
+                                    value={hVal}
+                                    placeholder="Header-Value"
+                                    onChange={(e) => {
+                                      update({
+                                        headers: {
+                                          ...(data.headers || {}),
+                                          [hKey]: e.target.value,
+                                        },
+                                      });
+                                    }}
+                                    className="w-full pr-6 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs font-mono text-slate-200 focus:outline-none focus:border-blue-500"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => openVarSelector(`header_${hKey}`)}
+                                    title="Insert Variable"
+                                    className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-500 hover:text-emerald-400"
+                                  >
+                                    <Variable className="w-3 h-3" />
+                                  </button>
+                                </div>
                                 <button
                                   type="button"
-                                  onClick={() => openVarSelector(`header_${hKey}`)}
-                                  title="Insert Variable"
-                                  className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-500 hover:text-emerald-400"
+                                  onClick={() => {
+                                    const newHeaders = { ...(data.headers || {}) };
+                                    delete newHeaders[hKey];
+                                    update({ headers: newHeaders });
+                                  }}
+                                  className="p-1 text-slate-500 hover:text-red-400"
                                 >
-                                  <Variable className="w-3 h-3" />
+                                  <Trash2 className="w-3 h-3" />
                                 </button>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const newHeaders = { ...(data.headers || {}) };
-                                  delete newHeaders[hKey];
-                                  update({ headers: newHeaders });
-                                }}
-                                className="p-1 text-slate-500 hover:text-red-400"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
+                              {renderVariableSuggestions(`header_${hKey}`)}
                             </div>
                           ))}
                         </div>
@@ -905,6 +964,7 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
                               Insert Variable
                             </button>
                           </div>
+                          {renderVariableSuggestions('body')}
                           <textarea
                             value={typeof data.body === 'object' ? JSON.stringify(data.body, null, 2) : data.body || ''}
                             onChange={(e) => {
