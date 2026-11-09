@@ -17,7 +17,7 @@
 
 - [x] **Phase 3: Execution Tracking Navigation URLs** - Enrich execution trigger and details responses with absolute navigation URLs (statusUrl, reportUrl, streamUrl) and standard HTTP Location header
 - [x] **Phase 4: Synchronous Wait Execution Mode** - Support ?wait=true and timeoutSec parameters on execution trigger for blocking execution in CI/CD pipelines (completed 2026-11-08)
-- [ ] **Phase 5: Sub-Workflow Variable Promotion & Global Flow Headers** - Enable workflows to include previous/sub-workflows as setup or sequential steps, automatically promoting extracted variables into global workflow settings and headers across both dynamic execution and standalone export
+- [x] **Phase 5: Sub-Workflow Variable Promotion & Global Flow Headers** - Enable workflows to include previous/sub-workflows as setup or sequential steps, automatically promoting extracted variables into global workflow settings and headers across both dynamic execution and standalone export (completed 2026-11-09)
 
 ## Phase Details
 
@@ -56,15 +56,15 @@ Plans:
   2. Users can configure an optional Pre-requisite / Setup Workflow in `WorkflowSettingsModal` that runs before canvas steps and populates global context
   3. Canvas `SubWorkflowNode` displays visual badges for exported variables and integrates with configuration drawer autocomplete
   4. Standalone Karate feature export (`/export/feature`) generates dynamic Karate header functions reflecting runtime context variables with 100% execution parity
-**Plans**: 2 plans
+**Plans**: 2/2 plans complete
 **UI hint**: yes
 
 Plans:
 **Wave 1**
-- [ ] 05-01-PLAN.md — Backend Dynamic Header Promotion, Setup Workflow Execution & Standalone Export Parity
+- [x] 05-01-PLAN.md — Backend Dynamic Header Promotion, Setup Workflow Execution & Standalone Export Parity
 
-**Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 05-02-PLAN.md — Frontend Setup Workflow Settings, Canvas Badges & Upstream Variable Autocomplete
+**Wave 2**
+- [x] 05-02-PLAN.md — Frontend Setup Workflow Settings, Canvas Badges & Upstream Variable Autocomplete
 
 ## Progress
 
@@ -74,4 +74,4 @@ Plans:
 | 2. Form URL-Encoded Requests End-to-End | v1.0 | 2/2 | Complete | 2026-11-07 |
 | 3. Execution Tracking Navigation URLs | v1.1 | 1/1 | Complete | 2026-11-08 |
 | 4. Synchronous Wait Execution Mode | v1.1 | 1/1 | Complete    | 2026-11-08 |
-| 5. Sub-Workflow Variable Promotion & Global Flow Headers | v1.1 | 0/2 | In progress | - |
+| 5. Sub-Workflow Variable Promotion & Global Flow Headers | v1.1 | 2/2 | Complete | 2026-11-09 |

@@ -19,15 +19,22 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **SYNC-02**: When `?wait=true` completes within timeout, the API returns HTTP 200 containing the completed execution entity, final `ExecutionStatus` (`COMPLETED` or `FAILED`), and generated `reportUrl`.
 - [x] **SYNC-03**: When `?wait=true` exceeds `timeoutSec`, the API responds gracefully with HTTP 504 Gateway Timeout or 202 status indicating background continuation.
 
-### CI/CD Webhook & cURL Modal
+### Sub-Workflow Chaining & Global Variable Promotion
 
-- [ ] **CURL-01**: `CiCdWebhookModal` displays the direct Karate HTML report URL format and live status checking cURL command alongside the trigger snippet.
-- [ ] **CURL-02**: `CiCdWebhookModal` provides toggleable choices between "Asynchronous Trigger (HTTP 202)" and "Synchronous CI/CD Pipeline (HTTP 200 with report link)".
-- [ ] **CURL-03**: `CiCdWebhookModal` provides a copyable bash script snippet for CI/CD pipelines that triggers execution, verifies exit status, and outputs the direct HTML report URL.
+- [x] **SUBWF-01**: Dynamic Global Header Variable Resolution — `DynamicKarateBridge.computeEffectiveHeaders` dynamically resolves `${variableName}` expressions from `globalContext` on every HTTP step, so variables extracted by preceding steps (or sub-workflows) automatically populate global default headers (e.g. `Authorization: Bearer ${authToken}`).
+- [x] **SUBWF-02**: Pre-requisite / Setup Workflow in Global Workflow Settings — `WorkflowSettingsModal` and AST schema support configuring an optional pre-requisite workflow that executes prior to the canvas steps, binding its output variables directly into `globalContext`.
+- [x] **SUBWF-03**: Canvas Sub-Workflow Quick-Add & Variable Badges — Visual canvas displays variable export chips on `SubWorkflowNode` indicating exported variables, with autocomplete support in the configuration drawer.
+- [x] **SUBWF-04**: Standalone Feature Export Parity — `TestWorkflowService.generateStandaloneKarateFeature` generates dynamic Karate header evaluation functions (`configure headers = function() { ... }`) that read from `context`, preserving 100% execution parity in offline / CI terminal runs.
 
 ## v2 Requirements
 
 Deferred to future releases. Tracked but not in current roadmap.
+
+### CI/CD Webhook & cURL Modal (Deferred)
+
+- **CURL-01**: `CiCdWebhookModal` displays the direct Karate HTML report URL format and live status checking cURL command alongside the trigger snippet.
+- **CURL-02**: `CiCdWebhookModal` provides toggleable choices between "Asynchronous Trigger (HTTP 202)" and "Synchronous CI/CD Pipeline (HTTP 200 with report link)".
+- **CURL-03**: `CiCdWebhookModal` provides a copyable bash script snippet for CI/CD pipelines that triggers execution, verifies exit status, and outputs the direct HTML report URL.
 
 ### Advanced CI/CD Integration
 
@@ -56,15 +63,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SYNC-01 | Phase 4 | Complete |
 | SYNC-02 | Phase 4 | Complete |
 | SYNC-03 | Phase 4 | Complete |
-| CURL-01 | Phase 5 | Pending |
-| CURL-02 | Phase 5 | Pending |
-| CURL-03 | Phase 5 | Pending |
+| SUBWF-01 | Phase 5 | Complete |
+| SUBWF-02 | Phase 5 | Complete |
+| SUBWF-03 | Phase 5 | Complete |
+| SUBWF-04 | Phase 5 | Complete |
 
 **Coverage:**
-- v1 requirements: 9 total
-- Mapped to phases: 9
+- v1 requirements: 10 total
+- Mapped to phases: 10
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-11-07*  
-*Last updated: 2026-11-07 for v1.1 milestone*
+*Last updated: 2026-11-09 for v1.1 milestone (Phase 5 scope updated to Sub-Workflow Chaining & Variable Promotion)*

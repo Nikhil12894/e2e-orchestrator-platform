@@ -3,7 +3,7 @@ phase: "05"
 slug: "sub-workflow-variable-promotion-global-flow-headers"
 status: draft
 nyquist_compliant: true
-wave_0_complete: false
+wave_0_complete: true
 created: "2026-11-09"
 ---
 
@@ -40,11 +40,11 @@ created: "2026-11-09"
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 05-01-01 | 01 | 1 | SUBWF-01 | T-05-01 | Preceding step variable extractions dynamically resolve in global flow headers for downstream HTTP steps | integration | `mvn test -Dtest=SubWorkflowCompositionTest#testDynamicGlobalHeaderVariableResolution -f backend/pom.xml` | ❌ W0 | ⬜ pending |
-| 05-01-02 | 01 | 1 | SUBWF-02 | T-05-02 | Pre-requisite / Setup Workflow executes before canvas steps, promoting variables to global scope | integration | `mvn test -Dtest=SubWorkflowCompositionTest#testSetupWorkflowExecutionAndPromotion -f backend/pom.xml` | ❌ W0 | ⬜ pending |
-| 05-01-03 | 01 | 1 | SUBWF-04 | T-05-03 | Standalone Karate feature export renders dynamic header function (`configure headers = function()`) with runtime context evaluation | unit / export | `mvn test -Dtest=SubWorkflowCompositionTest#testStandaloneKarateDynamicHeaderExport -f backend/pom.xml` | ❌ W0 | ⬜ pending |
-| 05-02-01 | 02 | 2 | SUBWF-02 | T-05-02 | WorkflowSettingsModal provides "Setup Workflow" tab with workflow picker and variable mapping | component / build | `npm --prefix frontend run build` | ✅ | ⬜ pending |
-| 05-02-02 | 02 | 2 | SUBWF-03 | T-05-01 | SubWorkflowNode displays exported variable badges and NodeConfigDrawer provides variable suggestion pills | component / build | `npm --prefix frontend run build` | ✅ | ⬜ pending |
+| 05-01-01 | 01 | 1 | SUBWF-01 | T-05-01 | Preceding step variable extractions dynamically resolve in global flow headers for downstream HTTP steps | integration | `mvn test -Dtest=SubWorkflowCompositionTest#testDynamicGlobalHeaderVariableResolution -f backend/pom.xml` | ✅ | ✅ green |
+| 05-01-02 | 01 | 1 | SUBWF-02 | T-05-02 | Pre-requisite / Setup Workflow executes before canvas steps, promoting variables to global scope | integration | `mvn test -Dtest=SubWorkflowCompositionTest#testSetupWorkflowExecutionAndPromotion -f backend/pom.xml` | ✅ | ✅ green |
+| 05-01-03 | 01 | 1 | SUBWF-04 | T-05-03 | Standalone Karate feature export renders dynamic header function (`configure headers = function()`) with runtime context evaluation | unit / export | `mvn test -Dtest=SubWorkflowCompositionTest#testStandaloneKarateDynamicHeaderExport -f backend/pom.xml` | ✅ | ✅ green |
+| 05-02-01 | 02 | 2 | SUBWF-02 | T-05-02 | WorkflowSettingsModal provides "Setup Workflow" tab with workflow picker and variable mapping | component / build | `npm --prefix frontend run build` | ✅ | ✅ green |
+| 05-02-02 | 02 | 2 | SUBWF-03 | T-05-01 | SubWorkflowNode displays exported variable badges and NodeConfigDrawer provides variable suggestion pills | component / build | `npm --prefix frontend run build` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
