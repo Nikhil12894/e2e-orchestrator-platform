@@ -132,6 +132,30 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
     }
   }, [selectedNode?.id, isOpen]);
 
+  // Upstream extracted variables from all other canvas nodes with extractions defined
+  const upstreamExportedVars = useMemo(() => {
+    if (!allNodes || !selectedNode) return [];
+    const vars: Array<{ variableName: string; sourceNodeName: string; jsonPath?: string }> = [];
+    const seen = new Set<string>();
+
+    allNodes.forEach((node) => {
+      if (node.id === selectedNode.id) return;
+      const extractions = node.data?.extractions || [];
+      extractions.forEach((ex: VariableExtraction) => {
+        if (ex.variableName && !seen.has(ex.variableName)) {
+          seen.add(ex.variableName);
+          vars.push({
+            variableName: ex.variableName,
+            sourceNodeName: node.data?.name || node.type || 'Node',
+            jsonPath: ex.jsonPath,
+          });
+        }
+      });
+    });
+
+    return vars;
+  }, [allNodes, selectedNode]);
+
   if (!isOpen || !selectedNode) return null;
 
   const data = selectedNode.data;
@@ -275,30 +299,6 @@ export const NodeConfigDrawer: React.FC<NodeConfigDrawerProps> = ({
     return acc;
   }, {} as Record<string, number>);
   const duplicateKeys = Object.keys(keyCounts).filter((k) => keyCounts[k] > 1);
-
-  // Upstream extracted variables from all other canvas nodes with extractions defined
-  const upstreamExportedVars = useMemo(() => {
-    if (!allNodes || !selectedNode) return [];
-    const vars: Array<{ variableName: string; sourceNodeName: string; jsonPath?: string }> = [];
-    const seen = new Set<string>();
-
-    allNodes.forEach((node) => {
-      if (node.id === selectedNode.id) return;
-      const extractions = node.data?.extractions || [];
-      extractions.forEach((ex: VariableExtraction) => {
-        if (ex.variableName && !seen.has(ex.variableName)) {
-          seen.add(ex.variableName);
-          vars.push({
-            variableName: ex.variableName,
-            sourceNodeName: node.data?.name || node.type || 'Node',
-            jsonPath: ex.jsonPath,
-          });
-        }
-      });
-    });
-
-    return vars;
-  }, [allNodes, selectedNode]);
 
   const insertVariableIntoField = (field: string, varExpr: string) => {
     if (!field) return;
