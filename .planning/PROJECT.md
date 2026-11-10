@@ -1,21 +1,23 @@
-# E2E Test Workflow Orchestrator - Execution Status & Report URLs for cURL / CI/CD
+# E2E Test Workflow Orchestrator
 
 ## What This Is
 
-The End-to-End Test Workflow Orchestrator is a full-stack developer platform for visually authoring, executing, and monitoring automated API, database, and event-driven test workflows. This milestone introduces comprehensive execution tracking, status monitoring, and Karate HTML report discovery for workflows triggered via cURL and external CI/CD pipelines.
+The End-to-End Test Workflow Orchestrator is a full-stack developer platform for visually authoring, executing, and monitoring automated API, database, and event-driven test workflows. Workflows can be constructed visually via an interactive canvas, executed asynchronously or synchronously on Java 25 Virtual Threads with real-time log streaming, and exported into 100% self-contained Karate Gherkin feature files runnable offline.
 
 ## Core Value
 
 Ensure complete functional parity and execution fidelity between visual workflows, dynamic in-memory Karate execution, and standalone exported Karate `.feature` files, while providing frictionless execution status tracking and direct HTML report access for automated pipelines and terminal users.
 
-## Current Milestone: v1.1 Execution Status & Report URLs for cURL / CI/CD
+## Current State
 
-**Goal:** Provide direct execution tracking, status monitoring, and Karate HTML report URLs when triggering workflows via cURL and CI/CD pipelines, supporting both asynchronous tracking and synchronous wait execution modes.
+- **Shipped v1.0** (2026-11-07): Standalone database polling export via self-contained inline JDBC functions (`java.sql.DriverManager`), `application/x-www-form-urlencoded` HTTP request drawer and engine execution, universal database support, and standalone Karate CLI runner (`meterflow-karate-standalone.jar`).
+- **Shipped v1.1** (2026-11-10): Hypermedia execution tracking (RFC 7231 `Location` header, `statusUrl`, `reportUrl`, `streamUrl`), synchronous blocking wait execution mode (`?wait=true&timeoutSec=N`), pre-requisite setup workflow execution, dynamic global flow headers with reactive variable promotion, canvas export badges, and upstream variable suggestion chips.
 
-**Target features:**
-- Execution Response Navigation URLs: Include absolute `statusUrl`, `reportUrl`, and `streamUrl` properties in `POST /api/v1/workflows/{id}/execute` and `GET /api/v1/executions/{id}`, plus an HTTP `Location` header.
-- Synchronous Execution Parameter: Support `?wait=true` (with optional `&timeoutSec=N`) on the execution trigger endpoint so CI/CD callers can block until completion and receive final status and report link directly in the response.
-- CI/CD Webhook Modal Enhancements: Update the visual modal to display enriched response structures, status polling cURL snippets, and synchronous pipeline commands.
+## Next Milestone Goals
+
+- **CI/CD Webhook & cURL Modal**: Visual modal providing ready-to-use cURL commands for asynchronous polling, synchronous wait execution, and direct Karate HTML report link opening.
+- **CI/CD Pipeline Snippets**: Copyable bash and GitHub Actions workflow templates (`.github/workflows/e2e-run.yml`) for automated pipeline integration.
+- **Reporting Enhancements**: Dedicated JUnit XML / Karate JSON report download endpoint (`/api/v1/executions/{id}/report/karate-summary.json`) for CI test result parsers.
 
 ## Requirements
 
@@ -29,32 +31,28 @@ Ensure complete functional parity and execution fidelity between visual workflow
 - ✓ Kafka consumer assertion steps for event-driven testing — existing
 - ✓ Real-time execution logs and progress streaming via WebSocket STOMP and SSE — existing
 - ✓ Standalone Karate `.feature` file export for HTTP, delay, and transform steps — existing
-- ✓ **Karate Feature Export for DB Poll Steps**: Export executable database polling steps in standalone `.feature` files utilizing self-contained inline JDBC functions (`java.sql.DriverManager`), supporting retry loops, expected row counts, custom SQL conditions, and downstream variable extraction without requiring proprietary platform classes on external classpaths — v1.0 Phase 1
-- ✓ **HTTP Form URL-Encoded Configuration Drawer**: Add a Request Body Type toggle (`JSON` vs `x-www-form-urlencoded`) in the visual node drawer when method is `POST`, `PUT`, or `PATCH`, with an interactive key-value table editor, variable injection, and automatic `Content-Type: application/x-www-form-urlencoded` header synchronization — v1.0 Phase 2
-- ✓ **HTTP Form URL-Encoded AST & Execution**: Enhance `HttpRequestStepConfig` with body type support and update `execute-http.feature` to natively invoke Karate's `form fields` keyword instead of `request` when sending form-encoded requests — v1.0 Phase 2
-- ✓ **HTTP Form URL-Encoded Standalone Export**: Update `TestWorkflowService.generateStandaloneKarateFeature()` to emit native Karate `form fields` syntax when exporting form-encoded HTTP steps — v1.0 Phase 2
-- ✓ **Execution Navigation URLs (EXEC-01)**: Execution trigger (`POST /api/v1/workflows/{id}/execute`) and details (`GET /api/v1/executions/{id}`) responses provide absolute `statusUrl`, `reportUrl`, and `streamUrl` navigation URLs resolved against request origin / reverse-proxy headers — Phase 3
-- ✓ **Execution Location Header (EXEC-02)**: Execution trigger endpoint sets standard RFC 7231 `Location` response header matching the absolute `statusUrl` — Phase 3
-- ✓ **Synchronous Wait Execution Mode (EXEC-03)**: Workflow execution trigger endpoint supports `?wait=true` (with defensive `&timeoutSec=N` clamping), blocking on Java 25 Virtual Threads until execution completes and returning HTTP 200 with completed entity, final status, and populated `reportUrl`, or graceful HTTP 504/202 timeout continuation — Phase 4
+- ✓ **Karate Feature Export for DB Poll Steps (DBEXP-01..04)**: Export executable database polling steps in standalone `.feature` files utilizing self-contained inline JDBC functions (`java.sql.DriverManager`), supporting retry loops, expected row counts, custom SQL conditions, and downstream variable extraction without requiring proprietary platform classes on external classpaths — v1.0 Phase 1
+- ✓ **HTTP Form URL-Encoded Requests (FORM-01..04)**: Full-stack `application/x-www-form-urlencoded` support across visual configuration drawer (table editor, variable injection, auto-sync headers), runtime execution engine (`form fields`), and standalone feature exporter — v1.0 Phase 2
+- ✓ **Execution Navigation URLs (EXEC-01, EXEC-02, EXEC-03)**: Execution trigger (`POST /api/v1/workflows/{id}/execute`) and details (`GET /api/v1/executions/{id}`) responses provide absolute `statusUrl`, `reportUrl`, and `streamUrl` navigation URLs resolved against request origin / reverse-proxy headers, plus standard RFC 7231 `Location` header — v1.1 Phase 3
+- ✓ **Synchronous Wait Execution Mode (SYNC-01, SYNC-02, SYNC-03)**: Workflow execution trigger endpoint supports `?wait=true` (with defensive `&timeoutSec=N` clamping), blocking on Java 25 Virtual Threads until execution completes and returning HTTP 200 with completed entity, final status, and populated `reportUrl`, or graceful HTTP 504/202 timeout continuation — v1.1 Phase 4
+- ✓ **Dynamic Global Header Resolution (SUBWF-01)**: `DynamicKarateBridge.computeEffectiveHeaders` dynamically re-resolves global flow headers on every HTTP step using live execution context, allowing preceding steps or sub-workflows to satisfy global headers (e.g. `Authorization: Bearer ${authToken}`) — v1.1 Phase 5
+- ✓ **Pre-Requisite Setup Workflow (SUBWF-02)**: Setup workflow model persisted in AST and `CanvasState`; `DynamicKarateRunner` prepends synthetic setup step at index 0 and promotes variables to parent context, configured via dedicated "Setup Workflow" tab in `WorkflowSettingsModal` — v1.1 Phase 5
+- ✓ **Canvas Badges & Suggestion Chips (SUBWF-03)**: `SubWorkflowNode` renders amber Zap badges for exported variables; `NodeConfigDrawer` renders one-click Sparkles suggestion chips (`+ ${varName}`) across URL, header, and body inputs — v1.1 Phase 5
+- ✓ **Standalone Feature Export Parity (SUBWF-04)**: Standalone feature export emits native Karate dynamic JavaScript header callback (`* configure headers = function() { ... }`) and inlines setup workflow steps for 100% execution parity — v1.1 Phase 5
 - ✓ **Standalone Karate Sub-Workflow Feature Export**: Inlines nested sub-workflows recursively into a single self-contained Karate feature, preserving context binding, variable scope isolation, and parent variable extraction while enforcing a visited-workflow guard to prevent circular references
 - ✓ **Universal Database Support & Standalone Karate CLI Runner**: Shaded standalone JAR (`meterflow-karate-standalone.jar`) bundling Karate Core 2.1.4, multi-database JDBC drivers (PostgreSQL, MySQL, SQL Server, Oracle, MariaDB, SQLite, H2), and dynamic `--driver-dir` JAR loading via `DbHelper` (`DbHelper.poll()`, `DbHelper.query()`, `DbHelper.executeUpdate()`)
 
-### Active
-
-- [ ] **EXEC-04**: `CiCdWebhookModal` provides clear cURL commands for async execution with status check, synchronous wait mode, and direct Karate HTML report link template.
-
 ### Out of Scope
 
-- Multipart / form-data file uploads — separate milestone; this milestone focuses on execution URLs and status tracking.
+- Multipart / form-data file uploads — separate milestone.
 - External standalone JAR dependency requirements for DB tests — standalone exported Karate features remain runnable using only standard JDBC drivers and standard Karate CLI/Maven.
 
 ## Context
 
-Shipped v1.0 milestone delivering standalone Karate database polling export and full-stack `application/x-www-form-urlencoded` HTTP request support.
-- Codebase state: 7 key files modified across backend and frontend (+1,123 / -40 lines).
-- Backend: Java 25 LTS, Spring Boot 4.1.2, Karate Core 2.1.4, HikariCP, PostgreSQL. `WorkflowFeaturesAndPortabilityTest` has 16/16 tests passing.
-- Frontend: React 18, TypeScript 5.6.3, @xyflow/react, Tailwind CSS, Vite (`tsc && vite build` passing with 0 errors).
-- Zero technical debt or verification gaps remaining. Future enhancements (multipart/form-data, raw query string editor, multi-table DB assertions) tracked for subsequent milestones.
+Shipped v1.1 milestone delivering execution navigation URLs, synchronous wait execution mode, and sub-workflow variable promotion with dynamic global flow headers.
+- Codebase state: 75 backend tests passing in `SubWorkflowCompositionTest`, `WorkflowExecutionSyncModeTest`, `WorkflowExecutionNavigationUrlTest`, and `WorkflowFeaturesAndPortabilityTest`.
+- Frontend: TypeScript 5.6.3, React 18, Vite (`tsc && vite build` passing with 0 errors).
+- Zero technical debt or verification gaps remaining.
 
 ## Constraints
 
@@ -73,26 +71,12 @@ Shipped v1.0 milestone delivering standalone Karate database polling export and 
 | Framework-managed proxy strategy `server.forward-headers-strategy: framework` | Standardizes reverse proxy URL adaptation via Spring's `ForwardedHeaderFilter` | ✓ Validated in Phase 3 |
 | Non-blocking Virtual Thread carrier unmounting with `CompletableFuture` | Allows synchronous callers to await completion without holding or pinning OS carrier threads | ✓ Validated in Phase 4 |
 | Defensive parameter clamping (1s-300s) on synchronous wait | Prevents connection starvation attacks while providing reliable timeouts | ✓ Validated in Phase 4 |
+| Per-request dynamic header evaluation via `DynamicKarateBridge` | Allows tokens extracted during execution (e.g. from setup workflows) to reactively satisfy global flow headers | ✓ Validated in Phase 5 |
+| Zero-migration AST storage in existing PostgreSQL `jsonb` columns for `setupWorkflow` | Preserves database schema stability while adding rich setup workflow capabilities | ✓ Validated in Phase 5 |
+| Standalone feature export parity via native Karate JavaScript `configure headers = function() { ... }` callbacks | Preserves dynamic runtime behavior when running exported features in terminal or CI without the server | ✓ Validated in Phase 5 |
 | Recursive inlining with cycle guards for sub-workflow export | Emits a single self-contained `.feature` file without external feature path dependencies while preventing infinite recursion | ✓ Validated |
 | Zero-dependency `DbHelper` with `DriverManager.registerDriver` | Enables arbitrary external JDBC drivers via `--driver-dir` without requiring re-compilation or shading of uncommon drivers | ✓ Validated |
 | Dedicated `standalone-karate` Maven Shade profile with transformer override | Avoids collision with Spring Boot starter parent resource transformer while producing an optimized 129MB all-in-one Karate CLI runnable anywhere | ✓ Validated |
 
-## Evolution
-
-This document evolves at phase transitions and milestone boundaries.
-
-**After each phase transition** (via `/gsd-transition`):
-1. Requirements invalidated? → Move to Out of Scope with reason
-2. Requirements validated? → Move to Validated with phase reference
-3. New requirements emerged? → Add to Active
-4. Decisions to log? → Add to Key Decisions
-5. "What This Is" still accurate? → Update if drifted
-
-**After each milestone** (via `/gsd-complete-milestone`):
-1. Full review of all sections
-2. Core Value check — still the right priority?
-3. Audit Out of Scope — reasons still valid?
-4. Update Context with current state
-
 ---
-*Last updated: 2026-11-08 after Phase 04*
+*Last updated: 2026-11-10 after Milestone v1.1 closeout*
