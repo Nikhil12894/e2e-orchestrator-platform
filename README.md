@@ -11,18 +11,6 @@
 
 ---
 
-## 🎬 Live Platform Demo & UI Tour
-
-<p align="center">
-  <b>Watch the complete walk-through of visual workflow orchestration, real-time Karate test execution, and profiling reports:</b>
-</p>
-
-<video src="images/Screen%20Recording%202026-11-25%20at%203.38.50%E2%80%AFPM.mov" controls="controls" muted="muted" width="100%"></video>
-
-> 📹 **[Download / Watch Full Video Demo (.mov)](images/Screen%20Recording%202026-11-25%20at%203.38.50%E2%80%AFPM.mov)** *(95s walk-through: visual canvas, auto-alignment, execution streaming, and profiling reports)*
-
----
-
 ### 🖼️ Platform Screenshots
 
 #### 1. Interactive Visual Flow Canvas & Real-Time Execution Console
