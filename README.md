@@ -11,6 +11,64 @@
 
 ---
 
+## 🎬 Live Platform Demo & UI Tour
+
+<p align="center">
+  <b>Watch the complete walk-through of visual workflow orchestration, real-time Karate test execution, and profiling reports:</b>
+</p>
+
+<video src="images/Screen%20Recording%202026-11-25%20at%203.38.50%E2%80%AFPM.mov" controls="controls" muted="muted" width="100%"></video>
+
+> 📹 **[Download / Watch Full Video Demo (.mov)](images/Screen%20Recording%202026-11-25%20at%203.38.50%E2%80%AFPM.mov)** *(95s walk-through: visual canvas, auto-alignment, execution streaming, and profiling reports)*
+
+---
+
+### 🖼️ Platform Screenshots
+
+#### 1. Interactive Visual Flow Canvas & Real-Time Execution Console
+Drag-and-drop endpoints from your OpenAPI catalog, wire conditional dependencies, trigger test executions, and inspect live step outputs directly in the streaming slide-up console.
+
+<p align="center">
+  <img src="images/Screenshot%202026-11-25%20at%203.40.58%E2%80%AFPM.png" alt="MeterFlow Interactive Visual Canvas & Live Execution Console" width="100%" />
+</p>
+
+#### 2. Executive Workflow Profiling & Latency Diagnostics
+Instant post-execution insights featuring bottleneck analysis, step latency waterfall visualization, and an interactive diagnostic payload inspector with extracted variables.
+
+<p align="center">
+  <img src="images/Screenshot%202026-11-25%20at%203.41.08%E2%80%AFPM.png" alt="Executive Workflow Profiling Report" width="100%" />
+</p>
+
+#### 3. Native Karate 2.1.4 HTML Test Report Dashboard
+Deep-dive into self-contained Karate HTML reports containing complete HTTP wire traces, headers, assertions, and scenario metrics.
+
+<p align="center">
+  <img src="images/Screenshot%202026-11-25%20at%203.41.19%E2%80%AFPM.png" alt="Karate HTML Test Report Dashboard" width="100%" />
+</p>
+
+#### 4. Gherkin Scenario Execution & Step Diagnostics
+Step-by-step diagnostic view of dynamically compiled Karate feature scenarios executing in memory with Java interop bridge hooks.
+
+<p align="center">
+  <img src="images/Screenshot%202026-11-25%20at%203.41.29%E2%80%AFPM.png" alt="Karate Scenario Execution Diagnostics" width="100%" />
+</p>
+
+#### 5. Step Configuration Drawer with Dynamic Variable Injection
+Configure HTTP endpoints, SQL DB queries, custom retries, and header inheritance with one-click dynamic variable suggestions (`${orderId}`, `${dbOrderStatus}`, `${trackingCode}`).
+
+<p align="center">
+  <img src="images/Screenshot%202026-11-25%20at%203.41.56%E2%80%AFPM.png" alt="Step Configuration Drawer & Dynamic Variables" width="100%" />
+</p>
+
+#### 6. Workflow Settings, Multi-Environment Scopes & Secrets
+Manage global and dynamic correlation headers, environment-scoped properties (`default`, `staging`, `production`), and encrypted secrets with automatic log redaction.
+
+<p align="center">
+  <img src="images/Screenshot%202026-11-25%20at%203.41.36%E2%80%AFPM.png" alt="Workflow Settings, Environments & Secrets" width="100%" />
+</p>
+
+---
+
 ## 🏛️ System Architecture
 
 ```mermaid
@@ -338,7 +396,7 @@ The application will be live at:
 
 ## 🧪 Running Tests
 
-The test suite includes 72 automated tests covering the entire execution lifecycle, Karate bridge interop, universal database execution, and storage reclamation:
+The test suite includes 80 automated tests covering the entire execution lifecycle, Karate bridge interop, universal database execution, sub-workflow dynamic & environment variable resolution, and storage reclamation:
 
 ```bash
 cd backend
@@ -348,11 +406,11 @@ mvn test
 ### Key Test Coverage
 - `WorkflowFeaturesAndPortabilityTest`: Standalone Karate `.feature` export, Sub-Workflow scenario inlining with variable extractions, circular reference protection, JSON export/import, mid-flight cancellation, form URL-encoded requests, step muting, and step retry configuration.
 - `DbHelperTest`: Universal database polling, expected row count matching, condition evaluation, timeout handling, DDL/DML update execution, token macro interpolation, and JDBC driver auto-detection across all engines.
-- `SubWorkflowCompositionTest`: In-memory modular sub-workflow execution, variable inheritance, scoped environment properties, and parent context variable extraction.
+- `SubWorkflowCompositionTest`: In-memory modular sub-workflow execution, child environment properties resolution (`${idp_url}`), dynamic macro evaluation (`${$randomUuid}`, `${$timestamp}`), multi-pass nested variable resolution, variable inheritance, scoped environment properties, and parent context variable extraction.
 - `DynamicKarateRunnerTest`: Multi-step end-to-end workflow execution with token extraction, variable chaining, status assertions, and HTML report generation.
 - `ExecutionCleanupAndStorageReclamationTest`: Automated report directory deletion, disk reclamation calculation, and batch execution purging.
 - `DbExecutorAndReportExclusionTest`: Multi-database query execution (PostgreSQL, MySQL, MariaDB, Oracle DB, SQL Server, SQLite, H2) and report exclusion flags.
-- `WorkflowContextEngineTest`: Macro evaluation (`${$timestamp}`, `${$randomUuid}`), `${$env:VAR}` resolution, and JSONPath extraction.
+- `WorkflowContextEngineTest`: Macro evaluation (`${$timestamp}`, `${$randomUuid}`), `${$env:VAR}` resolution, multi-pass iterative variable expansion, and JSONPath extraction.
 
 ---
 
