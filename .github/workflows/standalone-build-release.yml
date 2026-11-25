@@ -149,24 +149,25 @@ jobs:
             meterflow-standalone-distribution.zip.sha256
           retention-days: 30
 
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true)
+      - name: Publish Public GitHub Release
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.release_tag != '' && inputs.release_tag || github.ref_name }}
-          name: MeterFlow Standalone ${{ inputs.release_tag != '' && inputs.release_tag || github.ref_name }} (Zero-Docker)
-          draft: false
-          prerelease: false
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || (inputs.release_tag != '' && inputs.release_tag || 'standalone-latest') }}
+          name: ${{ startsWith(github.ref, 'refs/tags/v') && format('MeterFlow Standalone {0} (Zero-Docker)', github.ref_name) || 'MeterFlow Standalone (Latest Zero-Docker Release)' }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+          make_latest: ${{ startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' }}
           body: |
             ## MeterFlow Standalone Distribution (Zero-Docker Edition)
 
             🚀 Run the complete visual test workflow platform natively with **0 Docker** and **0 PostgreSQL**!
 
             ### Quickstart
-            1. Download `meterflow-standalone-distribution.zip` (or `meterflow-standalone.jar`).
+            1. Download `meterflow-standalone-distribution.zip` below.
             2. Extract and launch:
                ```bash
                # Linux / macOS
+               chmod +x run-standalone.sh
                ./run-standalone.sh
 
                # Windows
@@ -174,12 +175,12 @@ jobs:
                ```
             3. Open your browser at **`http://localhost:8080`**.
 
-            ### Features
-            - **Bundled React Web UI**: Pre-compiled visual canvas served directly on port `8080`.
-            - **Durable File Database**: Uses embedded H2 (`./data/meterflow.mv.db`) with full PostgreSQL dialect support.
+            ### Key Features
+            - **Bundled React Web UI**: Visual workflow canvas served directly on port `8080`.
+            - **Embedded H2 File Database**: Durable persistence in `./data/meterflow.mv.db`.
             - **Custom Karate Tools**: Built-in `DbHelper` (universal SQL poller) and `KafkaHelper` (message producer & consumer).
-            - **Pre-Seeded Workflows**: Instant out-of-the-box demo workflows on first boot.
-            - **Lightweight Footprint**: Memory-capped at `-Xmx256m` RAM.
+            - **Pre-Seeded Workflows**: Instant demo workflows on first boot.
+            - **Lightweight**: Memory-capped at `-Xmx256m` RAM.
           files: |
             dist-bundle/meterflow-standalone.jar
             meterflow-standalone-distribution.zip
