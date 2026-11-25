@@ -517,4 +517,171 @@ public class SubWorkflowCompositionTest {
         assertTrue(featureText.contains("def authToken = karate.get('authToken')"), "Must extract authToken from child");
         assertTrue(featureText.contains("End Setup Workflow: Auth Seed Setup"), "Must complete setup workflow block");
     }
+
+    @Test
+    @DisplayName("Verify Sub-Workflow resolves child envProperties (such as idp_url) and configured variables without URISyntaxException")
+    public void testSubWorkflowResolvesIdpUrlAndChildEnvProperties() {
+        // 1. Create Child Workflow with configured envProperties (idp_url) and variables
+        TestWorkflowEntity childWf = new TestWorkflowEntity();
+        childWf.setName("Child Workflow - IDP Client");
+        childWf.setDescription("Calls orders endpoint using configured idp_url");
+
+        WorkflowAst childAst = new WorkflowAst();
+        Map<String, Object> defaultEnvProps = new HashMap<>();
+        defaultEnvProps.put("idp_url", "http://localhost:" + port + "/api/v1/mock");
+        defaultEnvProps.put("customServiceCode", "AUTH-SVC-01");
+        childAst.setEnvProperties(Map.of("default", defaultEnvProps));
+
+        Map<String, Object> childVars = new HashMap<>();
+        childVars.put("orderPayloadType", "STANDARD_ORDER");
+        childAst.setVariables(childVars);
+
+        WorkflowStep childHttp = new WorkflowStep();
+        childHttp.setId("step_child_idp_http");
+        childHttp.setName("IDP HTTP Order Call");
+        childHttp.setType(StepType.HTTP_REQUEST);
+        HttpRequestStepConfig httpConfig = new HttpRequestStepConfig();
+        // Uses ${idp_url} directly in URL path - must be resolved by bridge
+        httpConfig.setUrl("${idp_url}/orders");
+        httpConfig.setMethod("POST");
+        httpConfig.setExpectedStatus(201);
+        httpConfig.setBody(Map.of("userId", "user-idp-test", "type", "${orderPayloadType}"));
+        httpConfig.setHeaders(Map.of("X-Service-Code", "${customServiceCode}"));
+        childHttp.setHttpConfig(httpConfig);
+
+        childAst.setSteps(List.of(childHttp));
+        childWf.setWorkflowAst(childAst);
+        childWf.setCanvasState(new CanvasState());
+        childWf = workflowRepository.save(childWf);
+
+        // 2. Create Parent Workflow with SUB_WORKFLOW step referencing Child
+        TestWorkflowEntity parentWf = new TestWorkflowEntity();
+        parentWf.setName("Parent Workflow - IDP Caller");
+        WorkflowAst parentAst = new WorkflowAst();
+
+        WorkflowStep subWfStep = new WorkflowStep();
+        subWfStep.setId("step_call_idp_sub");
+        subWfStep.setName("Execute IDP Sub-Workflow");
+        subWfStep.setType(StepType.SUB_WORKFLOW);
+        SubWorkflowStepConfig subConfig = new SubWorkflowStepConfig();
+        subConfig.setWorkflowId(childWf.getId().toString());
+        subConfig.setWorkflowName(childWf.getName());
+        subConfig.setInheritParentContext(true);
+        subConfig.setInheritEnvAndSecrets(true);
+        subWfStep.setSubWorkflowConfig(subConfig);
+
+        parentAst.setSteps(List.of(subWfStep));
+        parentWf.setWorkflowAst(parentAst);
+        parentWf.setCanvasState(new CanvasState());
+        parentWf = workflowRepository.save(parentWf);
+
+        // 3. Execute Parent Workflow
+        WorkflowExecutionEntity exec = new WorkflowExecutionEntity();
+        exec.setWorkflowId(parentWf.getId());
+        exec.setWorkflowName(parentWf.getName());
+        exec.setStatus(ExecutionStatus.PENDING);
+        exec = executionRepository.save(exec);
+
+        WorkflowExecutionEntity finished = karateRunner.executeWorkflow(exec, parentWf, new HashMap<>(), "default");
+
+        // 4. Assertions: Must complete successfully and child HTTP step must execute with resolved ${idp_url}
+        assertEquals(ExecutionStatus.COMPLETED, finished.getStatus(), "Workflow must complete without URISyntaxException on ${idp_url}");
+
+        List<ExecutionStepResult> stepResults = finished.getStepResults();
+        assertNotNull(stepResults);
+        assertTrue(stepResults.size() >= 2, "Should contain sub-workflow step and child inner HTTP step");
+
+        ExecutionStepResult childHttpResult = stepResults.stream()
+                .filter(s -> "step_child_idp_http".equals(s.getStepId()))
+                .findFirst()
+                .orElse(null);
+        assertNotNull(childHttpResult, "Child HTTP step result must be present");
+        assertEquals(ExecutionStatus.COMPLETED, childHttpResult.getStatus());
+        assertEquals(201, childHttpResult.getHttpStatus());
+        assertEquals("AUTH-SVC-01", childHttpResult.getRequestHeaders().get("X-Service-Code"));
+    }
+
+    @Test
+    @DisplayName("Verify Sub-Workflow resolves dynamic macros (${$randomUuid}, ${$timestamp}) inside configured variables")
+    public void testSubWorkflowResolvesDynamicMacrosInConfiguredVariables() {
+        // 1. Create Child Workflow with variables holding dynamic expressions
+        TestWorkflowEntity childWf = new TestWorkflowEntity();
+        childWf.setName("Child Workflow - Dynamic Macros");
+
+        WorkflowAst childAst = new WorkflowAst();
+        Map<String, Object> defaultEnv = new HashMap<>();
+        defaultEnv.put("targetBaseUrl", "http://localhost:" + port);
+        childAst.setEnvProperties(Map.of("default", defaultEnv));
+
+        Map<String, Object> childVars = new HashMap<>();
+        childVars.put("dynamicUuid", "${$randomUuid}");
+        childVars.put("dynamicTimestamp", "${$timestamp}");
+        childVars.put("compositeEndpoint", "${targetBaseUrl}/api/v1/mock/orders");
+        childAst.setVariables(childVars);
+
+        WorkflowStep childHttp = new WorkflowStep();
+        childHttp.setId("step_child_dyn_http");
+        childHttp.setName("Post with Dynamic Variables");
+        childHttp.setType(StepType.HTTP_REQUEST);
+        HttpRequestStepConfig httpConfig = new HttpRequestStepConfig();
+        httpConfig.setUrl("${compositeEndpoint}");
+        httpConfig.setMethod("POST");
+        httpConfig.setExpectedStatus(201);
+        httpConfig.setBody(Map.of("userId", "dyn-user", "uuid", "${dynamicUuid}", "ts", "${dynamicTimestamp}"));
+        childHttp.setHttpConfig(httpConfig);
+
+        childAst.setSteps(List.of(childHttp));
+        childWf.setWorkflowAst(childAst);
+        childWf.setCanvasState(new CanvasState());
+        childWf = workflowRepository.save(childWf);
+
+        // 2. Create Parent Workflow calling Child
+        TestWorkflowEntity parentWf = new TestWorkflowEntity();
+        parentWf.setName("Parent Workflow - Caller of Dynamic Macros");
+        WorkflowAst parentAst = new WorkflowAst();
+
+        WorkflowStep subWfStep = new WorkflowStep();
+        subWfStep.setId("step_call_dyn_sub");
+        subWfStep.setName("Execute Dynamic Child");
+        subWfStep.setType(StepType.SUB_WORKFLOW);
+        SubWorkflowStepConfig subConfig = new SubWorkflowStepConfig();
+        subConfig.setWorkflowId(childWf.getId().toString());
+        subConfig.setWorkflowName(childWf.getName());
+        subWfStep.setSubWorkflowConfig(subConfig);
+
+        parentAst.setSteps(List.of(subWfStep));
+        parentWf.setWorkflowAst(parentAst);
+        parentWf.setCanvasState(new CanvasState());
+        parentWf = workflowRepository.save(parentWf);
+
+        // 3. Execute Parent Workflow
+        WorkflowExecutionEntity exec = new WorkflowExecutionEntity();
+        exec.setWorkflowId(parentWf.getId());
+        exec.setWorkflowName(parentWf.getName());
+        exec.setStatus(ExecutionStatus.PENDING);
+        exec = executionRepository.save(exec);
+
+        WorkflowExecutionEntity finished = karateRunner.executeWorkflow(exec, parentWf, new HashMap<>(), "default");
+        assertEquals(ExecutionStatus.COMPLETED, finished.getStatus());
+
+        List<ExecutionStepResult> stepResults = finished.getStepResults();
+        ExecutionStepResult httpRes = stepResults.stream()
+                .filter(s -> "step_child_dyn_http".equals(s.getStepId()))
+                .findFirst()
+                .orElse(null);
+        assertNotNull(httpRes);
+        assertEquals(ExecutionStatus.COMPLETED, httpRes.getStatus());
+
+        // Verify request payload was resolved (not literal placeholders)
+        Object payloadObj = httpRes.getRequestPayload();
+        assertNotNull(payloadObj);
+        Map<?, ?> payloadMap = (Map<?, ?>) payloadObj;
+        String sentUuid = String.valueOf(payloadMap.get("uuid"));
+        String sentTs = String.valueOf(payloadMap.get("ts"));
+
+        assertFalse(sentUuid.contains("${"), "UUID must not contain raw placeholder: " + sentUuid);
+        assertTrue(sentUuid.matches("[a-f0-9\\-]{36}"), "UUID must be a valid formatted UUID: " + sentUuid);
+        assertFalse(sentTs.contains("${"), "Timestamp must not contain raw placeholder: " + sentTs);
+        assertTrue(sentTs.matches("\\d+"), "Timestamp must be a numeric string: " + sentTs);
+    }
 }

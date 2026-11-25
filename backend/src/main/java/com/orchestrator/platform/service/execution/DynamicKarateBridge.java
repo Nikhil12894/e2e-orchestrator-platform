@@ -6,8 +6,11 @@ import com.orchestrator.platform.domain.enums.ExecutionStatus;
 import com.orchestrator.platform.domain.enums.StepType;
 import com.orchestrator.platform.domain.model.ast.DbPollStepConfig;
 import com.orchestrator.platform.domain.model.ast.KafkaAssertStepConfig;
+import com.orchestrator.platform.domain.model.ast.SetupWorkflowConfig;
 import com.orchestrator.platform.domain.model.ast.SubWorkflowStepConfig;
+import com.orchestrator.platform.domain.model.ast.VariableExtraction;
 import com.orchestrator.platform.domain.model.ast.WorkflowAst;
+import com.orchestrator.platform.domain.model.ast.WorkflowStep;
 import com.orchestrator.platform.domain.model.dto.ExecutionEventDto;
 import com.orchestrator.platform.domain.model.dto.ExecutionStepResult;
 import com.orchestrator.platform.repository.TestWorkflowRepository;
@@ -404,37 +407,86 @@ public class DynamicKarateBridge {
 
             TestWorkflowEntity subWf = subOpt.get();
             WorkflowAst ast = subWf.getWorkflowAst();
-            List<?> subSteps = Collections.emptyList();
-            if (ast != null && ast.getSteps() != null) {
-                subSteps = instance.objectMapper.convertValue(ast.getSteps(), List.class);
+
+            // Detect active environment
+            String activeEnv = "default";
+            if (activePayload.get("environment") != null) {
+                activeEnv = activePayload.get("environment").toString().trim();
+            } else if (System.getProperty("karate.env") != null) {
+                activeEnv = System.getProperty("karate.env").trim();
             }
+
+            // Prepare executable steps (including prerequisite setup workflow if present)
+            List<WorkflowStep> executableSteps = new ArrayList<>();
+            if (ast != null && ast.getSetupWorkflow() != null && ast.getSetupWorkflow().isEnabled()
+                    && ast.getSetupWorkflow().getWorkflowId() != null && !ast.getSetupWorkflow().getWorkflowId().isBlank()) {
+                SetupWorkflowConfig setupCfg = ast.getSetupWorkflow();
+                String setupTargetId = setupCfg.getWorkflowId().trim();
+                if (targetWfId.toString().equalsIgnoreCase(setupTargetId) || callStack.contains(UUID.fromString(setupTargetId))) {
+                    log.warn("Circular setup workflow reference detected for child workflow {}: {}", targetWfId, setupTargetId);
+                } else {
+                    WorkflowStep setupStep = new WorkflowStep();
+                    setupStep.setId("step_setup_" + UUID.randomUUID().toString().replace("-", ""));
+                    setupStep.setName(setupCfg.getWorkflowName() != null ? setupCfg.getWorkflowName() : "Setup Workflow");
+                    setupStep.setType(StepType.SUB_WORKFLOW);
+                    setupStep.setEnabled(true);
+
+                    SubWorkflowStepConfig subConfig = new SubWorkflowStepConfig();
+                    subConfig.setWorkflowId(setupTargetId);
+                    subConfig.setWorkflowName(setupCfg.getWorkflowName());
+                    subConfig.setInheritEnvAndSecrets(setupCfg.isInheritEnvAndSecrets());
+                    subConfig.setInheritParentContext(true);
+                    subConfig.setInheritFlowHeaders(true);
+                    setupStep.setSubWorkflowConfig(subConfig);
+                    if (setupCfg.getExtractions() != null) {
+                        setupStep.setExtractions(new ArrayList<>(setupCfg.getExtractions()));
+                    }
+                    executableSteps.add(setupStep);
+                }
+            }
+            if (ast != null && ast.getSteps() != null) {
+                executableSteps.addAll(ast.getSteps());
+            }
+
+            List<?> subSteps = instance.objectMapper.convertValue(executableSteps, List.class);
 
             // Build child execution context
             Map<String, Object> childContext = new LinkedHashMap<>();
 
-            // 1. Inherit parent runtime variables (from previous steps)
-            if (config.isInheritParentContext()) {
-                if (globalContext != null) {
-                    childContext.putAll(globalContext);
+            // 1. Child workflow's own environment properties (default + activeEnv)
+            Map<String, Object> childEnvProps = new LinkedHashMap<>();
+            if (ast != null && ast.getEnvProperties() != null) {
+                if (ast.getEnvProperties().containsKey("default") && ast.getEnvProperties().get("default") != null) {
+                    childEnvProps.putAll(ast.getEnvProperties().get("default"));
                 }
-                childContext.putAll(parentCtx);
+                if (!"default".equalsIgnoreCase(activeEnv) && ast.getEnvProperties().containsKey(activeEnv)
+                        && ast.getEnvProperties().get(activeEnv) != null) {
+                    childEnvProps.putAll(ast.getEnvProperties().get(activeEnv));
+                }
+            }
+            if (!childEnvProps.isEmpty()) {
+                childContext.putAll(childEnvProps);
+                childContext.put("env", childEnvProps);
             }
 
-            // 2. Inherit environment properties and secrets
-            if (config.isInheritEnvAndSecrets()) {
-                if (parentCtx.containsKey("env")) {
-                    childContext.put("env", parentCtx.get("env"));
+            // 2. Child workflow's own secrets (default + activeEnv + flat secrets)
+            Map<String, String> childSecrets = new LinkedHashMap<>();
+            if (ast != null && ast.getEnvSecrets() != null) {
+                if (ast.getEnvSecrets().containsKey("default") && ast.getEnvSecrets().get("default") != null) {
+                    childSecrets.putAll(ast.getEnvSecrets().get("default"));
                 }
-                if (parentCtx.containsKey("secrets")) {
-                    childContext.put("secrets", parentCtx.get("secrets"));
-                    if (parentCtx.get("secrets") instanceof Map<?, ?> secMap) {
-                        for (Map.Entry<?, ?> se : secMap.entrySet()) {
-                            if (se.getKey() != null && se.getValue() != null) {
-                                childContext.put(se.getKey().toString(), se.getValue());
-                            }
-                        }
-                    }
+                if (!"default".equalsIgnoreCase(activeEnv) && ast.getEnvSecrets().containsKey(activeEnv)
+                        && ast.getEnvSecrets().get(activeEnv) != null) {
+                    childSecrets.putAll(ast.getEnvSecrets().get(activeEnv));
                 }
+            }
+            if (ast != null && ast.getSecrets() != null && !ast.getSecrets().isEmpty()) {
+                childSecrets.putAll(ast.getSecrets());
+            }
+            if (!childSecrets.isEmpty()) {
+                childContext.putAll(childSecrets);
+                childContext.put("secrets", childSecrets);
+                instance.logBroadcaster.registerSecrets(parseUuid(executionId), childSecrets.values());
             }
 
             // 3. Child workflow's own static variables
@@ -442,9 +494,45 @@ public class DynamicKarateBridge {
                 childContext.putAll(ast.getVariables());
             }
 
-            // 4. Resolve and apply explicit input variables passed by parent step
+            // 4. Inherit parent environment properties and secrets
+            if (config.isInheritEnvAndSecrets()) {
+                if (parentCtx.get("env") instanceof Map<?, ?> parentEnvMap) {
+                    Map<String, Object> mergedEnv = new LinkedHashMap<>(childEnvProps);
+                    for (Map.Entry<?, ?> ee : parentEnvMap.entrySet()) {
+                        if (ee.getKey() != null && ee.getValue() != null) {
+                            childContext.put(ee.getKey().toString(), ee.getValue());
+                            mergedEnv.put(ee.getKey().toString(), ee.getValue());
+                        }
+                    }
+                    childContext.put("env", mergedEnv);
+                }
+                if (parentCtx.get("secrets") instanceof Map<?, ?> parentSecMap) {
+                    Map<String, String> mergedSec = new LinkedHashMap<>(childSecrets);
+                    for (Map.Entry<?, ?> se : parentSecMap.entrySet()) {
+                        if (se.getKey() != null && se.getValue() != null) {
+                            childContext.put(se.getKey().toString(), se.getValue());
+                            mergedSec.put(se.getKey().toString(), se.getValue().toString());
+                        }
+                    }
+                    childContext.put("secrets", mergedSec);
+                }
+            }
+
+            // 5. Inherit parent runtime context (with runtime globalContext taking precedence over parentCtx)
+            if (config.isInheritParentContext()) {
+                childContext.putAll(parentCtx);
+                if (globalContext != null) {
+                    childContext.putAll(globalContext);
+                }
+            }
+
+            // 6. Resolve and apply explicit input variables passed by parent step
             if (config.getInputVariables() != null && !config.getInputVariables().isEmpty()) {
-                Object resolvedInputs = instance.contextEngine.resolveObject(config.getInputVariables(), parentCtx);
+                Map<String, Object> parentCombinedCtx = new LinkedHashMap<>(parentCtx);
+                if (globalContext != null) {
+                    parentCombinedCtx.putAll(globalContext);
+                }
+                Object resolvedInputs = instance.contextEngine.resolveObject(config.getInputVariables(), parentCombinedCtx);
                 if (resolvedInputs instanceof Map<?, ?> inMap) {
                     for (Map.Entry<?, ?> entry : inMap.entrySet()) {
                         if (entry.getKey() != null) {
@@ -454,12 +542,21 @@ public class DynamicKarateBridge {
                 }
             }
 
-            // 5. Update call stack in child context to prevent child from calling any parent in stack
+            // 7. Iteratively resolve any dynamic/configured expressions present in childContext
+            for (Map.Entry<String, Object> entry : new ArrayList<>(childContext.entrySet())) {
+                Object val = entry.getValue();
+                if (val instanceof String s && s.contains("${")) {
+                    Object resolvedVal = instance.contextEngine.resolveObject(s, childContext);
+                    childContext.put(entry.getKey(), resolvedVal);
+                }
+            }
+
+            // 8. Update call stack in child context to prevent child from calling any parent in stack
             Set<UUID> nextCallStack = new HashSet<>(callStack);
             nextCallStack.add(targetWfId);
             childContext.put(callStackKey, nextCallStack);
 
-            // 6. Inherit / compute flow headers
+            // 9. Inherit / compute flow headers and dynamic headers
             Map<String, Object> childFlowHeaders = new LinkedHashMap<>();
             if (config.isInheritFlowHeaders()) {
                 Object parentHeadersObj = activePayload.get("flowHeaders");
@@ -474,6 +571,13 @@ public class DynamicKarateBridge {
             if (ast != null && ast.getDefaultHeaders() != null) {
                 for (Map.Entry<String, String> e : ast.getDefaultHeaders().entrySet()) {
                     childFlowHeaders.put(e.getKey(), instance.contextEngine.resolveString(e.getValue(), childContext));
+                }
+            }
+            if (ast != null && ast.getDynamicHeaders() != null) {
+                for (Map.Entry<String, String> e : ast.getDynamicHeaders().entrySet()) {
+                    String resolvedVal = instance.contextEngine.resolveString(e.getValue(), childContext);
+                    childFlowHeaders.put(e.getKey(), resolvedVal);
+                    childContext.put(e.getKey(), resolvedVal);
                 }
             }
 

@@ -141,6 +141,7 @@ public class DynamicKarateRunner {
         workflowPayload.put("workflowId", workflow.getId().toString());
         workflowPayload.put("workflowName", workflow.getName());
         workflowPayload.put("flowHeaders", resolvedFlowHeaders);
+        workflowPayload.put("environment", selectedEnv);
 
         List<WorkflowStep> executableSteps = new ArrayList<>();
         if (ast != null && ast.getSetupWorkflow() != null && ast.getSetupWorkflow().isEnabled()

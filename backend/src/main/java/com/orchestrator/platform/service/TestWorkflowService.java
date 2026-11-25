@@ -678,6 +678,34 @@ public class TestWorkflowService {
                                 sb.append("    # [SUB-WORKFLOW NOT FOUND: ").append(subId).append("]\n");
                             } else {
                                 sb.append("    # --- Begin Sub-Workflow: ").append(subWf.getName()).append(" (ID: ").append(subId).append(") ---\n");
+                                WorkflowAst subAst = subWf.getWorkflowAst();
+                                if (subAst != null) {
+                                    if (subAst.getEnvProperties() != null) {
+                                        Map<String, Object> defProps = subAst.getEnvProperties().get("default");
+                                        if (defProps != null && !defProps.isEmpty()) {
+                                            sb.append("    # Sub-Workflow Environment Properties\n");
+                                            for (Map.Entry<String, Object> entry : defProps.entrySet()) {
+                                                if (entry.getKey() != null && entry.getValue() != null) {
+                                                    String k = entry.getKey();
+                                                    String v = String.valueOf(entry.getValue());
+                                                    sb.append("    * def ").append(k).append(" = karate.properties['").append(k).append("'] || ").append(formatKarateExpression(v)).append("\n");
+                                                    sb.append("    * eval context['").append(k).append("'] = karate.get('").append(k).append("')\n");
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (subAst.getVariables() != null && !subAst.getVariables().isEmpty()) {
+                                        sb.append("    # Sub-Workflow Configured Variables\n");
+                                        for (Map.Entry<String, Object> entry : subAst.getVariables().entrySet()) {
+                                            if (entry.getKey() != null && entry.getValue() != null) {
+                                                String k = entry.getKey();
+                                                String v = String.valueOf(entry.getValue());
+                                                sb.append("    * def ").append(k).append(" = ").append(formatKarateExpression(v)).append("\n");
+                                                sb.append("    * eval context['").append(k).append("'] = karate.get('").append(k).append("')\n");
+                                            }
+                                        }
+                                    }
+                                }
                                 if (subCfg.getInputVariables() != null && !subCfg.getInputVariables().isEmpty()) {
                                     sb.append("    # Sub-Workflow Input Variables\n");
                                     for (Map.Entry<String, Object> inputVar : subCfg.getInputVariables().entrySet()) {

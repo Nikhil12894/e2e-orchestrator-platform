@@ -33,23 +33,39 @@ public class WorkflowContextEngine {
 
     /**
      * Resolves all ${placeholder} tokens in a string using values from the context.
+     * Supports iterative multi-pass resolution (up to 5 passes) for nested placeholders.
      */
     public String resolveString(String input, Map<String, Object> context) {
-        if (input == null || !input.contains("${")) {
+        if (input == null || !input.contains("${") || context == null) {
             return input;
         }
 
-        Matcher matcher = PLACEHOLDER_PATTERN.matcher(input);
-        StringBuilder sb = new StringBuilder();
+        String current = input;
+        int maxPasses = 5;
+        for (int pass = 0; pass < maxPasses && current.contains("${"); pass++) {
+            Matcher matcher = PLACEHOLDER_PATTERN.matcher(current);
+            StringBuilder sb = new StringBuilder();
+            boolean changed = false;
 
-        while (matcher.find()) {
-            String expression = matcher.group(1).trim();
-            Object resolvedValue = resolveExpression(expression, context);
-            String replacement = resolvedValue != null ? String.valueOf(resolvedValue) : matcher.group(0);
-            matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+            while (matcher.find()) {
+                String expression = matcher.group(1).trim();
+                Object resolvedValue = resolveExpression(expression, context);
+                if (resolvedValue != null) {
+                    String replacement = String.valueOf(resolvedValue);
+                    matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+                    changed = true;
+                } else {
+                    matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group(0)));
+                }
+            }
+            matcher.appendTail(sb);
+            String next = sb.toString();
+            if (!changed || next.equals(current)) {
+                break;
+            }
+            current = next;
         }
-        matcher.appendTail(sb);
-        return sb.toString();
+        return current;
     }
 
     /**
@@ -193,6 +209,10 @@ public class WorkflowContextEngine {
             if (str.startsWith("${") && str.endsWith("}") && str.indexOf("${", 2) == -1) {
                 String expr = str.substring(2, str.length() - 1).trim();
                 Object rawResolved = resolveExpression(expr, context);
+                if (rawResolved instanceof String resStr && resStr.contains("${")) {
+                    Object nested = resolveObject(resStr, context);
+                    return nested != null ? nested : rawResolved;
+                }
                 return rawResolved != null ? rawResolved : str;
             }
             return resolveString(str, context);
