@@ -1,0 +1,187 @@
+name: Build & Release Standalone JAR (Zero-Docker)
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+      - 'v*'
+    paths:
+      - 'standalone/**'
+      - 'backend/**'
+      - 'frontend/**'
+      - 'build-standalone.*'
+      - 'run-standalone.*'
+      - '.github/workflows/standalone-build-release.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'standalone/**'
+      - 'backend/**'
+      - 'frontend/**'
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish as GitHub Release (in addition to Action Artifacts)'
+        required: true
+        default: false
+        type: boolean
+      release_tag:
+        description: 'Release tag (required if publishing release manually, e.g. v1.0.0)'
+        required: false
+        default: ''
+        type: string
+
+concurrency:
+  group: standalone-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-package:
+    name: Build & Package Standalone Distribution
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js Runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Set up Java 25 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+          cache: 'maven'
+
+      - name: Build Web Canvas Frontend
+        run: |
+          echo "Building Frontend Static Assets..."
+          cd frontend
+          npm ci
+          npm run build
+
+      - name: Run Standalone Module Tests
+        run: |
+          echo "Executing Standalone Integration Tests..."
+          cd standalone
+          mvn clean test
+
+      - name: Package Standalone Fat-JAR
+        run: |
+          echo "Packaging meterflow-standalone.jar..."
+          cd standalone
+          mvn package -DskipTests
+
+      - name: Prepare Standalone Distribution Bundle
+        run: |
+          mkdir -p dist-bundle
+          cp standalone/target/meterflow-standalone.jar dist-bundle/
+          cp run-standalone.sh dist-bundle/
+          cp run-standalone.bat dist-bundle/
+          chmod +x dist-bundle/run-standalone.sh
+
+          cat << 'EOF' > dist-bundle/README.txt
+          ========================================================================
+           MeterFlow Standalone (Zero-Docker / Bundled Web UI & H2 File DB)
+          ========================================================================
+
+          REQUIREMENTS:
+            - Java 21 or Java 25 JRE / JDK installed
+
+          HOW TO RUN:
+            - Linux / macOS:
+                chmod +x run-standalone.sh
+                ./run-standalone.sh
+                (or: java -Xmx256m -jar meterflow-standalone.jar)
+
+            - Windows:
+                run-standalone.bat
+                (or: java -Xmx256m -jar meterflow-standalone.jar)
+
+          WEB INTERFACE:
+            Open your browser at: http://localhost:8080
+
+          PERSISTENCE:
+            All workflows, mock endpoints, and test execution histories are
+            automatically saved in: ./data/meterflow.mv.db
+          ========================================================================
+          EOF
+
+          # Create distribution zip
+          cd dist-bundle
+          zip -r ../meterflow-standalone-distribution.zip ./*
+          cd ..
+
+          # Generate SHA256 checksums
+          sha256sum dist-bundle/meterflow-standalone.jar > meterflow-standalone.jar.sha256
+          sha256sum meterflow-standalone-distribution.zip > meterflow-standalone-distribution.zip.sha256
+
+      - name: Upload Standalone JAR as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: meterflow-standalone-jar
+          path: dist-bundle/meterflow-standalone.jar
+          retention-days: 30
+
+      - name: Upload Standalone Distribution ZIP as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: meterflow-standalone-distribution-zip
+          path: meterflow-standalone-distribution.zip
+          retention-days: 30
+
+      - name: Upload Checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: |
+            meterflow-standalone.jar.sha256
+            meterflow-standalone-distribution.zip.sha256
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag != '' && inputs.release_tag || github.ref_name }}
+          name: MeterFlow Standalone ${{ inputs.release_tag != '' && inputs.release_tag || github.ref_name }} (Zero-Docker)
+          draft: false
+          prerelease: false
+          body: |
+            ## MeterFlow Standalone Distribution (Zero-Docker Edition)
+
+            🚀 Run the complete visual test workflow platform natively with **0 Docker** and **0 PostgreSQL**!
+
+            ### Quickstart
+            1. Download `meterflow-standalone-distribution.zip` (or `meterflow-standalone.jar`).
+            2. Extract and launch:
+               ```bash
+               # Linux / macOS
+               ./run-standalone.sh
+
+               # Windows
+               run-standalone.bat
+               ```
+            3. Open your browser at **`http://localhost:8080`**.
+
+            ### Features
+            - **Bundled React Web UI**: Pre-compiled visual canvas served directly on port `8080`.
+            - **Durable File Database**: Uses embedded H2 (`./data/meterflow.mv.db`) with full PostgreSQL dialect support.
+            - **Custom Karate Tools**: Built-in `DbHelper` (universal SQL poller) and `KafkaHelper` (message producer & consumer).
+            - **Pre-Seeded Workflows**: Instant out-of-the-box demo workflows on first boot.
+            - **Lightweight Footprint**: Memory-capped at `-Xmx256m` RAM.
+          files: |
+            dist-bundle/meterflow-standalone.jar
+            meterflow-standalone-distribution.zip
+            meterflow-standalone.jar.sha256
+            meterflow-standalone-distribution.zip.sha256

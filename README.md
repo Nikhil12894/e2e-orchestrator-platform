@@ -252,6 +252,33 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
+### Option C: Zero-Docker Standalone Runner (Low Resource / Single Runnable JAR)
+
+If you have a low-resource machine (e.g. 512MB–2GB RAM) or cannot run Docker locally, use the **standalone distribution**:
+- **0 Docker containers, 0 PostgreSQL installations needed**
+- Bundles the React Visual Canvas UI directly inside the Spring Boot JAR
+- Uses an embedded **H2 file-based database** (`./data/meterflow.mv.db`) for persistent workflow storage
+- Includes custom Karate Java tools (`DbHelper` for universal SQL queries/polls and `KafkaHelper` for message produce/consume)
+- Memory-capped at **256MB RAM** (`-Xmx256m`)
+
+#### 1. Download or Build the Standalone JAR
+- **Download**: Grab `meterflow-standalone-distribution.zip` or `meterflow-standalone.jar` from **GitHub Actions Artifacts** or **Releases**.
+- **Or Build Locally**:
+  ```bash
+  ./build-standalone.sh
+  # On Windows: build-standalone.bat
+  ```
+
+#### 2. Launch
+```bash
+./run-standalone.sh
+# On Windows: run-standalone.bat
+# Or directly: java -Xmx256m -jar standalone/target/meterflow-standalone.jar
+```
+Open **[http://localhost:8080](http://localhost:8080)** in your browser. All reference workflows and demo microservices are seeded automatically on first boot.
+
+---
+
 ## 🐳 Docker Hub Build & Deployment
 
 ### Multi-Architecture Support

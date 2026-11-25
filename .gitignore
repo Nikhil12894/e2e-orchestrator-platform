@@ -1,2 +1,10 @@
 .agents/
 target/
+standalone/target/
+backend/target/
+frontend/dist/
+data/
+*.db
+*.mv.db
+*.log
+.DS_Store

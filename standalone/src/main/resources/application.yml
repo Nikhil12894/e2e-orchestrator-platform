@@ -1,0 +1,51 @@
+server:
+  port: ${PORT:8080}
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+
+spring:
+  application:
+    name: meterflow-standalone
+
+  datasource:
+    url: jdbc:h2:file:./data/meterflow;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;AUTO_SERVER=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-timeout: 20000
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: false
+
+  flyway:
+    enabled: false
+
+  threads:
+    virtual:
+      enabled: true
+
+  web:
+    resources:
+      static-locations: classpath:/static/
+
+orchestrator:
+  reports:
+    base-path: ${ORCHESTRATOR_REPORTS_PATH:./data/reports}
+  cleanup:
+    max-completed-executions: 100
+    retention-days: 14
+
+logging:
+  level:
+    root: INFO
+    com.orchestrator.platform: INFO
+    org.hibernate.SQL: WARN
