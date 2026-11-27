@@ -13,6 +13,8 @@ on:
       - 'frontend/**'
       - 'build-standalone.*'
       - 'run-standalone.*'
+      - 'build-standalone-karate.*'
+      - 'run-standalone-karate.*'
       - '.github/workflows/standalone-build-release.yml'
   pull_request:
     branches:
@@ -21,6 +23,10 @@ on:
       - 'standalone/**'
       - 'backend/**'
       - 'frontend/**'
+      - 'build-standalone.*'
+      - 'run-standalone.*'
+      - 'build-standalone-karate.*'
+      - 'run-standalone-karate.*'
   workflow_dispatch:
     inputs:
       publish_release:
@@ -76,44 +82,62 @@ jobs:
           cd standalone
           mvn clean test
 
-      - name: Package Standalone Fat-JAR
+      - name: Package Standalone Web Fat-JAR
         run: |
-          echo "Packaging meterflow-standalone.jar..."
+          echo "Packaging meterflow-standalone.jar (Zero-Docker Web UI + H2 DB)..."
           cd standalone
           mvn package -DskipTests
+
+      - name: Package Standalone Karate CLI Runner
+        run: |
+          echo "Packaging meterflow-karate-standalone.jar (Headless Karate CLI + DB/Kafka Tools)..."
+          cd backend
+          mvn package -Pstandalone-karate -DskipTests
 
       - name: Prepare Standalone Distribution Bundle
         run: |
           mkdir -p dist-bundle
           cp standalone/target/meterflow-standalone.jar dist-bundle/
+          cp backend/target/meterflow-karate-standalone.jar dist-bundle/
           cp run-standalone.sh dist-bundle/
           cp run-standalone.bat dist-bundle/
-          chmod +x dist-bundle/run-standalone.sh
+          cp run-standalone-karate.sh dist-bundle/
+          cp run-standalone-karate.bat dist-bundle/
+          chmod +x dist-bundle/run-standalone.sh dist-bundle/run-standalone-karate.sh
 
           cat << 'EOF' > dist-bundle/README.txt
           ========================================================================
-           MeterFlow Standalone (Zero-Docker / Bundled Web UI & H2 File DB)
+           MeterFlow Standalone Distribution
           ========================================================================
 
           REQUIREMENTS:
             - Java 21 or Java 25 JRE / JDK installed
 
-          HOW TO RUN:
-            - Linux / macOS:
-                chmod +x run-standalone.sh
-                ./run-standalone.sh
-                (or: java -Xmx256m -jar meterflow-standalone.jar)
+          1. METERFLOW STANDALONE (WEB PLATFORM):
+             Runs the full visual test orchestration platform with embedded H2 DB.
+             - Linux / macOS:
+                 chmod +x run-standalone.sh
+                 ./run-standalone.sh
+                 (or: java -Xmx256m -jar meterflow-standalone.jar)
+             - Windows:
+                 run-standalone.bat
+                 (or: java -Xmx256m -jar meterflow-standalone.jar)
+             - Web Interface:
+                 http://localhost:8080
+             - Persistence:
+                 ./data/meterflow.mv.db
 
-            - Windows:
-                run-standalone.bat
-                (or: java -Xmx256m -jar meterflow-standalone.jar)
-
-          WEB INTERFACE:
-            Open your browser at: http://localhost:8080
-
-          PERSISTENCE:
-            All workflows, mock endpoints, and test execution histories are
-            automatically saved in: ./data/meterflow.mv.db
+          2. METERFLOW STANDALONE KARATE RUNNER (HEADLESS CLI):
+             Runs exported Karate features headlessly with all enterprise tools intact
+             (7 bundled JDBC drivers, DbHelper, KafkaHelper, and dynamic macros).
+             - Linux / macOS:
+                 chmod +x run-standalone-karate.sh
+                 ./run-standalone-karate.sh path/to/my-workflow.feature -e staging
+                 (or: java -jar meterflow-karate-standalone.jar path/to/workflow.feature)
+             - Windows:
+                 run-standalone-karate.bat path\to\my-workflow.feature -e staging
+             - Load external JDBC drivers (Snowflake, ClickHouse, etc.):
+                 ./run-standalone-karate.sh --driver-dir=./drivers my-workflow.feature
           ========================================================================
           EOF
 
@@ -124,13 +148,21 @@ jobs:
 
           # Generate SHA256 checksums
           sha256sum dist-bundle/meterflow-standalone.jar > meterflow-standalone.jar.sha256
+          sha256sum dist-bundle/meterflow-karate-standalone.jar > meterflow-karate-standalone.jar.sha256
           sha256sum meterflow-standalone-distribution.zip > meterflow-standalone-distribution.zip.sha256
 
-      - name: Upload Standalone JAR as Workflow Artifact
+      - name: Upload Standalone Web JAR as Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
           name: meterflow-standalone-jar
           path: dist-bundle/meterflow-standalone.jar
+          retention-days: 30
+
+      - name: Upload Standalone Karate CLI JAR as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: meterflow-karate-standalone-jar
+          path: dist-bundle/meterflow-karate-standalone.jar
           retention-days: 30
 
       - name: Upload Standalone Distribution ZIP as Workflow Artifact
@@ -146,6 +178,7 @@ jobs:
           name: checksums
           path: |
             meterflow-standalone.jar.sha256
+            meterflow-karate-standalone.jar.sha256
             meterflow-standalone-distribution.zip.sha256
           retention-days: 30
 
@@ -154,35 +187,47 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || (inputs.release_tag != '' && inputs.release_tag || 'standalone-latest') }}
-          name: ${{ startsWith(github.ref, 'refs/tags/v') && format('MeterFlow Standalone {0} (Zero-Docker)', github.ref_name) || 'MeterFlow Standalone (Latest Zero-Docker Release)' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/v') && format('MeterFlow Standalone {0}', github.ref_name) || 'MeterFlow Standalone (Latest Release)' }}
           prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
           make_latest: ${{ startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' }}
           body: |
-            ## MeterFlow Standalone Distribution (Zero-Docker Edition)
+            ## MeterFlow Standalone Distribution (Zero-Docker & Headless Karate CLI)
 
-            🚀 Run the complete visual test workflow platform natively with **0 Docker** and **0 PostgreSQL**!
+            🚀 Complete visual test orchestration and portable Karate CLI testing with **0 Docker** and **0 PostgreSQL**!
 
-            ### Quickstart
-            1. Download `meterflow-standalone-distribution.zip` below.
-            2. Extract and launch:
-               ```bash
-               # Linux / macOS
-               chmod +x run-standalone.sh
-               ./run-standalone.sh
+            ### Included Deliverables
 
-               # Windows
-               run-standalone.bat
-               ```
-            3. Open your browser at **`http://localhost:8080`**.
+            #### 1. MeterFlow Standalone Web Platform (`meterflow-standalone.jar`)
+            Run the full visual workflow canvas, REST APIs, and embedded H2 file database on port `8080`:
+            ```bash
+            # Linux / macOS
+            chmod +x run-standalone.sh
+            ./run-standalone.sh
 
-            ### Key Features
-            - **Bundled React Web UI**: Visual workflow canvas served directly on port `8080`.
-            - **Embedded H2 File Database**: Durable persistence in `./data/meterflow.mv.db`.
-            - **Custom Karate Tools**: Built-in `DbHelper` (universal SQL poller) and `KafkaHelper` (message producer & consumer).
-            - **Pre-Seeded Workflows**: Instant demo workflows on first boot.
-            - **Lightweight**: Memory-capped at `-Xmx256m` RAM.
+            # Windows
+            run-standalone.bat
+            ```
+            - Open browser at **`http://localhost:8080`**.
+            - Persistent database saved automatically in `./data/meterflow.mv.db`.
+
+            #### 2. MeterFlow Standalone Karate CLI Runner (`meterflow-karate-standalone.jar`)
+            Run exported Karate test features headlessly with all enterprise tools intact:
+            ```bash
+            # Linux / macOS
+            chmod +x run-standalone-karate.sh
+            ./run-standalone-karate.sh my-workflow.feature -e staging
+
+            # Windows
+            run-standalone-karate.bat my-workflow.feature -e staging
+            ```
+            - **7 Bundled JDBC Drivers**: PostgreSQL, MySQL, MariaDB, Oracle, SQL Server, SQLite, and H2.
+            - **Custom Tools**: Built-in `DbHelper` (SQL query/polling) and `KafkaHelper` (message produce/consume).
+            - **Dynamic Driver Loading**: Pass `--driver-dir=./drivers` for external JDBC drivers.
+            - **Optimized Footprint**: Shaded down to ~85 MB.
           files: |
             dist-bundle/meterflow-standalone.jar
+            dist-bundle/meterflow-karate-standalone.jar
             meterflow-standalone-distribution.zip
             meterflow-standalone.jar.sha256
+            meterflow-karate-standalone.jar.sha256
             meterflow-standalone-distribution.zip.sha256
