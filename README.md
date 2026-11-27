@@ -197,17 +197,22 @@ flowchart TD
   * match pollRes.matched == true
   * match pollRes.row.status == 'COMPLETED'
   ```
-- **Dedicated Standalone Fat JAR**:
+- **Dedicated Standalone Karate Fat JAR**:
+  Build and run headless Karate CLI tests with all enterprise tools intact (bundled JDBC drivers, `DbHelper`, `KafkaHelper`, token interpolation):
   ```bash
-  # Package standalone Karate JAR
-  cd backend
-  mvn package -Pstandalone-karate -DskipTests
+  # Quick 1-step build script
+  ./build-standalone-karate.sh
 
-  # Run standalone features with universal DB support
-  java -jar backend/target/meterflow-karate-standalone.jar my-workflow.feature -e staging
+  # Or build via Maven from backend/ or standalone/
+  cd backend && mvn package -Pstandalone-karate -DskipTests
+  # Or: cd standalone && mvn package -Pstandalone-karate -DskipTests
 
-  # Run with extra third-party drivers
-  java -jar backend/target/meterflow-karate-standalone.jar --driver-dir=./drivers my-workflow.feature
+  # Run standalone features using runner script or java -jar
+  ./run-standalone-karate.sh my-workflow.feature -e staging
+  # Or: java -jar backend/target/meterflow-karate-standalone.jar -f my-workflow.feature -e staging
+
+  # Run with extra third-party JDBC drivers
+  ./run-standalone-karate.sh --driver-dir=./drivers my-workflow.feature
   ```
 
 ### 7. Granular HTTP Header Inheritance & Environment Secrets

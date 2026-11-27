@@ -7,6 +7,8 @@ function fn() {
 
   var env = karate.env || 'default';
   return {
-    env: env
+    env: env,
+    Db: Java.type('com.orchestrator.platform.karate.DbHelper'),
+    Kafka: Java.type('com.orchestrator.platform.karate.KafkaHelper')
   };
 }

@@ -27,6 +27,15 @@ public class KarateStandaloneMain {
                 if (i + 1 < args.length) {
                     driverDir = args[++i].trim();
                 }
+            } else if (arg.startsWith("--features=")) {
+                karateArgs.add(arg.substring("--features=".length()).trim());
+            } else if (arg.startsWith("-f=")) {
+                karateArgs.add(arg.substring("-f=".length()).trim());
+            } else if (arg.equals("-f") || arg.equals("--features")) {
+                // Translate -f / --features to Karate 2.x positional feature path
+                if (i + 1 < args.length) {
+                    karateArgs.add(args[++i].trim());
+                }
             } else if (arg.equals("--help") || arg.equals("-h")) {
                 printHelp();
                 karateArgs.add(arg);
@@ -74,7 +83,7 @@ public class KarateStandaloneMain {
             
             Options:
               --driver-dir, -d <path>   Directory with extra third-party driver JARs
-              -f, --features <path>     Feature file or directory to execute
+              -f, --features, -P <path> Feature file or directory to execute (or positional path)
               -e, --env <env>           Karate environment name (default: default)
               -t, --tags <tags>         Cucumber tag expression (e.g. '@e2e-workflow')
               -o, --output <dir>        Output directory for reports (default: target/karate-reports)

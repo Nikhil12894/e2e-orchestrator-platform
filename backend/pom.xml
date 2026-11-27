@@ -244,6 +244,22 @@
                 </goals>
                 <configuration>
                   <finalName>meterflow-karate-standalone</finalName>
+                  <artifactSet>
+                    <excludes>
+                      <exclude>org.springframework.boot:*</exclude>
+                      <exclude>org.springframework:*</exclude>
+                      <exclude>org.springframework.data:*</exclude>
+                      <exclude>org.hibernate.orm:*</exclude>
+                      <exclude>org.hibernate.validator:*</exclude>
+                      <exclude>org.apache.tomcat.embed:*</exclude>
+                      <exclude>org.springdoc:*</exclude>
+                      <exclude>io.swagger.parser.v3:*</exclude>
+                      <exclude>io.swagger.core.v3:*</exclude>
+                      <exclude>org.flywaydb:*</exclude>
+                      <exclude>net.bytebuddy:*</exclude>
+                      <exclude>org.jboss.logging:*</exclude>
+                    </excludes>
+                  </artifactSet>
                   <transformers combine.self="override">
                     <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                       <mainClass>com.orchestrator.platform.karate.standalone.KarateStandaloneMain</mainClass>
